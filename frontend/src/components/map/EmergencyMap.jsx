@@ -40,12 +40,12 @@ const MAP_LAYERS = {
 };
 
 export const INDIAN_REGIONS = [
-  { id: 'KA', name: 'Karnataka (Bengaluru)', center: [12.9716, 77.5946], zoom: 12 },
-  { id: 'TN', name: 'Tamil Nadu (Chennai)', center: [13.0604, 80.2496], zoom: 12 },
-  { id: 'MH', name: 'Maharashtra (Mumbai)', center: [19.0180, 72.8450], zoom: 12 },
-  { id: 'DL', name: 'Delhi NCR', center: [28.5672, 77.2100], zoom: 12 },
-  { id: 'TS', name: 'Telangana (Hyderabad)', center: [17.4228, 78.4533], zoom: 12 },
-  { id: 'KL', name: 'Kerala (Kochi)', center: [10.0380, 76.2620], zoom: 12 },
+  { id: 'TN', name: 'Tamil Nadu (Chennai)', shortName: 'Tamil Nadu', flag: '🌟', center: [13.0604, 80.2496], zoom: 12 },
+  { id: 'KA', name: 'Karnataka (Bengaluru)', shortName: 'Karnataka', flag: '🏛️', center: [12.9716, 77.5946], zoom: 12 },
+  { id: 'MH', name: 'Maharashtra (Mumbai)', shortName: 'Maharashtra', flag: '🏙️', center: [19.0180, 72.8450], zoom: 12 },
+  { id: 'DL', name: 'Delhi NCR', shortName: 'Delhi', flag: '🏛️', center: [28.5672, 77.2100], zoom: 12 },
+  { id: 'TS', name: 'Telangana (Hyderabad)', shortName: 'Telangana', flag: '🏢', center: [17.4228, 78.4533], zoom: 12 },
+  { id: 'KL', name: 'Kerala (Kochi)', shortName: 'Kerala', flag: '🌴', center: [10.0380, 76.2620], zoom: 12 },
 ];
 
 // Custom SVG DivIcons to ensure reliable rendering across all environments
@@ -187,14 +187,32 @@ const createIncidentIcon = (incident) => {
   });
 };
 
-// Map Recenter Controller
-function MapRecenter({ center }) {
+// Cinematic 60 FPS Camera Flight Controller
+function MapCameraController({ targetCoords }) {
   const map = useMap();
+  const lastKeyRef = React.useRef(null);
+
   useEffect(() => {
-    if (center && center[0] && center[1]) {
-      map.panTo(center, { animate: true });
+    if (!targetCoords || !targetCoords.center) return;
+    if (lastKeyRef.current === targetCoords.key) return;
+    lastKeyRef.current = targetCoords.key;
+
+    const [lat, lng] = targetCoords.center;
+    const targetZoom = targetCoords.zoom || 12;
+    const currentCenter = map.getCenter();
+    const distDeg = Math.hypot(currentCenter.lat - lat, currentCenter.lng - lng);
+
+    // If long distance (e.g. crossing states or > 0.15 deg), use Leaflet's smooth cinematic flyTo!
+    if (distDeg > 0.15) {
+      map.flyTo([lat, lng], targetZoom, {
+        duration: 1.5,
+        easeLinearity: 0.25,
+      });
+    } else {
+      map.panTo([lat, lng], { animate: true, duration: 0.6 });
     }
-  }, [center, map]);
+  }, [targetCoords, map]);
+
   return null;
 }
 
@@ -203,21 +221,76 @@ export const EmergencyMap = ({
   hospitals = [],
   incidents = [],
   activeIncident = null,
-  center = [12.9716, 77.5946], // Bangalore Metro Default
+  center = null,
   zoom = 12,
+  selectedRegionId = null,
+  onRegionChange = null,
   showTrafficOverlay = true,
   onSelectIncident,
   onSelectAmbulance,
 }) => {
   const [mapLayer, setMapLayer] = useState('google_streets');
-  const [currentRegion, setCurrentRegion] = useState(INDIAN_REGIONS[0]);
-  const [mapCenter, setMapCenter] = useState(center);
 
-  useEffect(() => {
-    if (center && center[0] && center[1]) {
-      setMapCenter(center);
+  // Default to Tamil Nadu or selectedRegionId
+  const [currentRegion, setCurrentRegion] = useState(() => {
+    if (selectedRegionId) {
+      const match = INDIAN_REGIONS.find((r) => r.id === selectedRegionId);
+      if (match) return match;
     }
-  }, [center]);
+    return INDIAN_REGIONS[0]; // Tamil Nadu (Chennai) default
+  });
+
+  const [targetCoords, setTargetCoords] = useState(() => ({
+    center: currentRegion.center,
+    zoom: currentRegion.zoom,
+    key: 'initial',
+  }));
+
+  // Handle manual state switch
+  const handleSelectRegion = (reg) => {
+    setCurrentRegion(reg);
+    setTargetCoords({
+      center: reg.center,
+      zoom: reg.zoom,
+      key: `reg-${reg.id}-${Date.now()}`,
+    });
+    if (onRegionChange) onRegionChange(reg);
+  };
+
+  // Sync if selectedRegionId changes from outside
+  useEffect(() => {
+    if (selectedRegionId && selectedRegionId !== currentRegion.id) {
+      const match = INDIAN_REGIONS.find((r) => r.id === selectedRegionId);
+      if (match) {
+        handleSelectRegion(match);
+      }
+    }
+  }, [selectedRegionId]);
+
+  // Smoothly fly to active incident when selected from queue
+  useEffect(() => {
+    if (activeIncident?.location?.latitude && activeIncident?.location?.longitude) {
+      const lat = activeIncident.location.latitude;
+      const lon = activeIncident.location.longitude;
+
+      // Find closest region for highlighting the state pill
+      let bestReg = INDIAN_REGIONS[0];
+      let bestDist = Infinity;
+      for (const reg of INDIAN_REGIONS) {
+        const d = Math.hypot(reg.center[0] - lat, reg.center[1] - lon);
+        if (d < bestDist) {
+          bestDist = d;
+          bestReg = reg;
+        }
+      }
+      setCurrentRegion(bestReg);
+      setTargetCoords({
+        center: [lat, lon],
+        zoom: 13,
+        key: `inc-${activeIncident.id || activeIncident._id || activeIncident.incidentCode || Date.now()}`,
+      });
+    }
+  }, [activeIncident]);
 
   // Extract active ambulance routes with live remaining distance & ETA calculations
   const activeRoutes = ambulances
@@ -264,9 +337,98 @@ export const EmergencyMap = ({
   return (
     <div className="relative w-full h-full min-h-[460px] rounded-xl overflow-hidden border border-slate-800 shadow-2xl z-0 isolate">
       
-      {/* Floating Mission Navigation HUD (Distance & ETA) */}
+      {/* Top Floating Bar: State Quick-Selector Pills & Google Maps Layer Switcher */}
+      <div className="absolute top-2.5 left-2.5 right-2.5 z-[400] flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+        
+        {/* State Quick-Selection Pills */}
+        <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700/90 p-1 rounded-2xl shadow-2xl flex flex-wrap items-center gap-1.5 pointer-events-auto">
+          <span className="text-[10px] font-black text-slate-400 px-1.5 uppercase tracking-wider hidden md:inline">
+            🇮🇳 State:
+          </span>
+          {INDIAN_REGIONS.map((reg) => {
+            const isSelected = currentRegion.id === reg.id;
+            
+            // Count active incidents in this region
+            const stateIncidents = incidents.filter((i) => {
+              const lat = i.location?.latitude;
+              const lon = i.location?.longitude;
+              return lat && lon && Math.hypot(reg.center[0] - lat, reg.center[1] - lon) < 1.2;
+            });
+            const hasActiveAlert = stateIncidents.some((i) => i.status !== 'Resolved');
+
+            return (
+              <button
+                key={reg.id}
+                type="button"
+                onClick={() => handleSelectRegion(reg)}
+                className={`px-2.5 py-1 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 shadow-md ${
+                  isSelected
+                    ? 'bg-blue-600 text-white shadow-blue-600/50 ring-2 ring-blue-400 scale-[1.03]'
+                    : 'bg-slate-800/90 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/80'
+                }`}
+              >
+                <span>{reg.flag}</span>
+                <span>{reg.shortName}</span>
+                {hasActiveAlert && (
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-ping inline-block" title="Active Emergency" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Google Maps Layer Switcher */}
+        <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700/90 p-1 rounded-xl text-xs shadow-2xl flex items-center space-x-1 pointer-events-auto">
+          <button
+            type="button"
+            onClick={() => setMapLayer('google_streets')}
+            className={`px-2 py-1 rounded-lg font-bold text-[11px] transition ${
+              mapLayer === 'google_streets'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                : 'text-slate-300 hover:bg-slate-800'
+            }`}
+          >
+            🗺️ Google Maps
+          </button>
+          <button
+            type="button"
+            onClick={() => setMapLayer('google_traffic')}
+            className={`px-2 py-1 rounded-lg font-bold text-[11px] transition ${
+              mapLayer === 'google_traffic'
+                ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30'
+                : 'text-slate-300 hover:bg-slate-800'
+            }`}
+          >
+            🚦 Traffic
+          </button>
+          <button
+            type="button"
+            onClick={() => setMapLayer('google_satellite')}
+            className={`px-2 py-1 rounded-lg font-bold text-[11px] transition ${
+              mapLayer === 'google_satellite'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                : 'text-slate-300 hover:bg-slate-800'
+            }`}
+          >
+            🛰️ Satellite
+          </button>
+          <button
+            type="button"
+            onClick={() => setMapLayer('osm')}
+            className={`px-2 py-1 rounded-lg font-bold text-[11px] transition ${
+              mapLayer === 'osm'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+                : 'text-slate-300 hover:bg-slate-800'
+            }`}
+          >
+            🌍 OSM
+          </button>
+        </div>
+      </div>
+
+      {/* Floating Mission Navigation HUD (Distance & ETA) - Placed below top bar */}
       {primaryRoute && (
-        <div className="absolute top-3 left-3 z-[400] bg-slate-900/95 border border-blue-500/50 rounded-2xl p-3 shadow-2xl backdrop-blur-md max-w-[280px] text-xs space-y-2 pointer-events-auto">
+        <div className="absolute top-16 left-3 z-[400] bg-slate-900/95 border border-blue-500/50 rounded-2xl p-3 shadow-2xl backdrop-blur-md max-w-[280px] text-xs space-y-2 pointer-events-auto">
           <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
             <div className="flex items-center space-x-2">
               <div className={`w-2.5 h-2.5 rounded-full ${primaryRoute.status === 'Arrived_Hospital' ? 'bg-emerald-400' : 'bg-blue-400'} animate-ping`} />
@@ -320,83 +482,17 @@ export const EmergencyMap = ({
         </div>
       )}
 
-      {/* Floating State Selector & Google Maps Layer Switcher */}
-      <div className="absolute top-3 right-3 z-[400] flex flex-wrap items-center gap-2">
-        {/* State Selector */}
-        <div className="bg-slate-900/90 backdrop-blur border border-slate-700 p-1 rounded-xl shadow-2xl flex items-center space-x-1">
-          <span className="text-[10px] font-bold text-slate-400 px-1">🇮🇳 State:</span>
-          <select
-            value={currentRegion.id}
-            onChange={(e) => {
-              const reg = INDIAN_REGIONS.find((r) => r.id === e.target.value);
-              if (reg) {
-                setCurrentRegion(reg);
-                setMapCenter(reg.center);
-              }
-            }}
-            className="bg-slate-800 text-slate-200 border border-slate-600 rounded-lg text-xs font-bold px-2 py-0.5 focus:outline-none"
-          >
-            {INDIAN_REGIONS.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Map Layers */}
-        <div className="bg-slate-900/90 backdrop-blur border border-slate-700 p-1 rounded-xl text-xs shadow-2xl flex items-center space-x-1">
-          <button
-            type="button"
-            onClick={() => setMapLayer('google_streets')}
-            className={`px-2 py-1 rounded-lg font-bold text-[11px] transition ${
-              mapLayer === 'google_streets'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                : 'text-slate-300 hover:bg-slate-800'
-            }`}
-          >
-            🗺️ Google Maps
-          </button>
-          <button
-            type="button"
-            onClick={() => setMapLayer('google_traffic')}
-            className={`px-2 py-1 rounded-lg font-bold text-[11px] transition ${
-              mapLayer === 'google_traffic'
-                ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30'
-                : 'text-slate-300 hover:bg-slate-800'
-            }`}
-          >
-            🚦 Traffic
-          </button>
-          <button
-            type="button"
-            onClick={() => setMapLayer('google_satellite')}
-            className={`px-2 py-1 rounded-lg font-bold text-[11px] transition ${
-              mapLayer === 'google_satellite'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-slate-300 hover:bg-slate-800'
-            }`}
-          >
-            🛰️ Satellite
-          </button>
-          <button
-            type="button"
-            onClick={() => setMapLayer('osm')}
-            className={`px-2 py-1 rounded-lg font-bold text-[11px] transition ${
-              mapLayer === 'osm'
-                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
-                : 'text-slate-300 hover:bg-slate-800'
-            }`}
-          >
-            🌍 OSM
-          </button>
-        </div>
-      </div>
-
       <MapContainer
-        center={mapCenter}
-        zoom={zoom}
+        center={targetCoords.center}
+        zoom={targetCoords.zoom}
+        preferCanvas={true}
+        zoomAnimation={true}
+        zoomAnimationThreshold={4}
+        fadeAnimation={true}
+        markerZoomAnimation={true}
         scrollWheelZoom={true}
+        wheelDebounceTime={40}
+        wheelPxPerZoomLevel={90}
         className="w-full h-full"
       >
         {/* Real Google Maps / Traffic / Satellite / OSM Layer */}
@@ -407,7 +503,8 @@ export const EmergencyMap = ({
           subdomains={MAP_LAYERS[mapLayer].subdomains || ['a', 'b', 'c']}
         />
 
-        <MapRecenter center={mapCenter} />
+        {/* 60 FPS Cinematic Camera Flight Controller */}
+        <MapCameraController targetCoords={targetCoords} />
 
         {/* Polylines for Active Dispatches (Dark Royal Blue Dual-Layer) */}
         {activeRoutes.map((route, idx) => {
@@ -452,14 +549,14 @@ export const EmergencyMap = ({
         {showTrafficOverlay && (
           <>
             <Circle
-              center={[mapCenter[0] - 0.009, mapCenter[1] + 0.013]}
+              center={[currentRegion.center[0] - 0.009, currentRegion.center[1] + 0.013]}
               radius={700}
-              pathOptions={{ color: '#EF4444', fillColor: '#EF4444', fillOpacity: 0.25, weight: 2 }}
+              pathOptions={{ color: '#EF4444', fillColor: '#EF4444', fillOpacity: 0.22, weight: 2 }}
             />
             <Circle
-              center={[mapCenter[0] + 0.016, mapCenter[1] + 0.03]}
+              center={[currentRegion.center[0] + 0.016, currentRegion.center[1] + 0.03]}
               radius={600}
-              pathOptions={{ color: '#F59E0B', fillColor: '#F59E0B', fillOpacity: 0.2, weight: 2 }}
+              pathOptions={{ color: '#F59E0B', fillColor: '#F59E0B', fillOpacity: 0.18, weight: 2 }}
             />
           </>
         )}

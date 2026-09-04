@@ -39,6 +39,20 @@
   animation: ping-slow 2.5s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
+/* Leaflet 60 FPS GPU Hardware Acceleration & Canvas Smoothing */
+.custom-amb-marker,
+.custom-hosp-marker,
+.custom-incident-marker,
+.custom-dist-badge {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.leaflet-container {
+  transform: translate3d(0, 0, 0);
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

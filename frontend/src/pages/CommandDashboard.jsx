@@ -28,6 +28,7 @@ export const CommandDashboard = ({ onOpenSOS }) => {
   const [hospitals, setHospitals] = useState([]);
   const [stats, setStats] = useState(null);
   const [selectedIncident, setSelectedIncident] = useState(null);
+  const [selectedRegionId, setSelectedRegionId] = useState('TN');
   const [showNewEmergencyModal, setShowNewEmergencyModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showXAIDialog, setShowXAIDialog] = useState(false);
@@ -218,6 +219,13 @@ export const CommandDashboard = ({ onOpenSOS }) => {
   }, [socket]);
 
   const handleApplyPreset = (preset) => {
+    if (preset.label.includes('TN')) setSelectedRegionId('TN');
+    else if (preset.label.includes('KA')) setSelectedRegionId('KA');
+    else if (preset.label.includes('MH')) setSelectedRegionId('MH');
+    else if (preset.label.includes('DL')) setSelectedRegionId('DL');
+    else if (preset.label.includes('KL')) setSelectedRegionId('KL');
+    else if (preset.label.includes('TS')) setSelectedRegionId('TS');
+
     setFormData((prev) => ({
       ...prev,
       chiefComplaint: preset.chiefComplaint,
@@ -457,6 +465,8 @@ export const CommandDashboard = ({ onOpenSOS }) => {
               hospitals={hospitals}
               incidents={incidents}
               activeIncident={selectedIncident}
+              selectedRegionId={selectedRegionId}
+              onRegionChange={(reg) => setSelectedRegionId(reg.id)}
               onSelectIncident={(inc) => setSelectedIncident(inc)}
             />
           </div>
