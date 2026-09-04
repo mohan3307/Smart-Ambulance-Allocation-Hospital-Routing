@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { 
@@ -9,8 +9,35 @@ import {
   Bed, 
   Flame, 
   Navigation,
-  Clock
+  Clock,
+  Layers
 } from 'lucide-react';
+
+const MAP_LAYERS = {
+  google_streets: {
+    name: 'Google Maps',
+    url: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+    attribution: '&copy; Google Maps',
+    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+  },
+  google_traffic: {
+    name: 'Google Traffic',
+    url: 'https://mt1.google.com/vt/lyrs=m,traffic&x={x}&y={y}&z={z}',
+    attribution: '&copy; Google Maps Live Traffic',
+    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+  },
+  google_satellite: {
+    name: 'Google Satellite',
+    url: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+    attribution: '&copy; Google Maps Satellite',
+    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+  },
+  osm: {
+    name: 'OpenStreetMap',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; OpenStreetMap contributors',
+  },
+};
 
 // Custom SVG DivIcons to ensure reliable rendering across all environments
 const createAmbulanceIcon = (ambulance) => {
@@ -109,6 +136,8 @@ export const EmergencyMap = ({
   onSelectIncident,
   onSelectAmbulance,
 }) => {
+  const [mapLayer, setMapLayer] = useState('google_streets');
+
   // Extract active ambulance routes for polyline display
   const activeRoutes = ambulances
     .filter((a) => a.activeRoute && a.activeRoute.length > 0)
@@ -121,16 +150,66 @@ export const EmergencyMap = ({
 
   return (
     <div className="relative w-full h-full min-h-[460px] rounded-xl overflow-hidden border border-slate-800 shadow-2xl">
+      {/* Floating Google Maps Layer Switcher */}
+      <div className="absolute top-3 right-3 z-[400] bg-slate-900/90 backdrop-blur border border-slate-700 p-1 rounded-xl text-xs shadow-2xl flex items-center space-x-1">
+        <button
+          type="button"
+          onClick={() => setMapLayer('google_streets')}
+          className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition ${
+            mapLayer === 'google_streets'
+              ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/30'
+              : 'text-slate-300 hover:bg-slate-800'
+          }`}
+        >
+          🗺️ Google Maps
+        </button>
+        <button
+          type="button"
+          onClick={() => setMapLayer('google_traffic')}
+          className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition ${
+            mapLayer === 'google_traffic'
+              ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30'
+              : 'text-slate-300 hover:bg-slate-800'
+          }`}
+        >
+          🚦 Google Traffic
+        </button>
+        <button
+          type="button"
+          onClick={() => setMapLayer('google_satellite')}
+          className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition ${
+            mapLayer === 'google_satellite'
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+              : 'text-slate-300 hover:bg-slate-800'
+          }`}
+        >
+          🛰️ Satellite
+        </button>
+        <button
+          type="button"
+          onClick={() => setMapLayer('osm')}
+          className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition ${
+            mapLayer === 'osm'
+              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+              : 'text-slate-300 hover:bg-slate-800'
+          }`}
+        >
+          🌍 OSM
+        </button>
+      </div>
+
       <MapContainer
         center={center}
         zoom={zoom}
         scrollWheelZoom={true}
         className="w-full h-full"
       >
-        {/* Clean OpenStreetMap Tiles (No watermark) */}
+        {/* Real Google Maps / Traffic / Satellite / OSM Layer */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          key={mapLayer}
+          attribution={MAP_LAYERS[mapLayer].attribution}
+          url={MAP_LAYERS[mapLayer].url}
+          subdomains={MAP_LAYERS[mapLayer].subdomains || ['a', 'b', 'c']}
         />
 
         <MapRecenter center={center} />
