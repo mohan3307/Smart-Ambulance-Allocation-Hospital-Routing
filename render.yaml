@@ -1,0 +1,24 @@
+﻿services:
+  - type: web
+    name: smart-ambulance-ai
+    runtime: python
+    rootDir: ai_service
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.12
+
+  - type: web
+    name: smart-ambulance-app
+    runtime: node
+    buildCommand: npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.10.0
+      - key: AI_SERVICE_URL
+        fromService:
+          type: web
+          name: smart-ambulance-ai
+          property: host

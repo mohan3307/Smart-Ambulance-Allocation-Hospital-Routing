@@ -1,0 +1,22 @@
+{
+  "name": "smart-ambulance-allocation-hospital-routing",
+  "version": "1.0.0",
+  "description": "AI-Powered Emergency Response Platform: Smart Ambulance Allocation and Dynamic Hospital Routing",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "npm install --prefix frontend && npm --prefix frontend run build && npm install --prefix backend",
+    "start": "node backend/src/server.js",
+    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev"
+  },
+  "keywords": [
+    "emergency-response",
+    "ambulance-routing",
+    "hospital-recommendation",
+    "ai-triage"
+  ],
+  "author": "mohan3307",
+  "license": "MIT"
+}
