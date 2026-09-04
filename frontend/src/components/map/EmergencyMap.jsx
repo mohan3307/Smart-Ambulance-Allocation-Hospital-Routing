@@ -149,7 +149,7 @@ export const EmergencyMap = ({
     }));
 
   return (
-    <div className="relative w-full h-full min-h-[460px] rounded-xl overflow-hidden border border-slate-800 shadow-2xl">
+    <div className="relative w-full h-full min-h-[460px] rounded-xl overflow-hidden border border-slate-800 shadow-2xl z-0 isolate">
       {/* Floating Google Maps Layer Switcher */}
       <div className="absolute top-3 right-3 z-[400] bg-slate-900/90 backdrop-blur border border-slate-700 p-1 rounded-xl text-xs shadow-2xl flex items-center space-x-1">
         <button
