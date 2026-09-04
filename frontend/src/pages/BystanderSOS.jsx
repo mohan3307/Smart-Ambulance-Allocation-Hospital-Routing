@@ -19,6 +19,16 @@ import { CPRMetronome } from '../components/firstaid/CPRMetronome';
 import { FirstAidProtocols } from '../components/firstaid/FirstAidProtocols';
 import { EmergencyAPI } from '../services/api';
 import { useSocket } from '../context/SocketContext';
+import { SoundFX } from '../services/soundEffects';
+
+const SOS_PRESET_CITIES = [
+  { name: '🌟 Chennai (TN)', address: 'Usman Road, T.Nagar, Chennai, Tamil Nadu', lat: 13.0418, lon: 80.2341 },
+  { name: '🏛️ Bengaluru (KA)', address: 'MG Road Metro Station, Bengaluru, Karnataka', lat: 12.9730, lon: 77.6010 },
+  { name: '🏙️ Mumbai (MH)', address: 'Dadar TT Circle, Mumbai, Maharashtra', lat: 19.0180, lon: 72.8450 },
+  { name: '🏛️ Delhi NCR', address: 'Ring Road Flyover, New Delhi', lat: 28.5700, lon: 77.2100 },
+  { name: '🏢 Hyderabad (TS)', address: 'Punjagutta Circle, Hyderabad, Telangana', lat: 17.4250, lon: 78.4480 },
+  { name: '🌴 Kochi (KL)', address: 'Marine Drive, Kochi, Kerala', lat: 10.0350, lon: 76.2700 },
+];
 
 export const BystanderSOS = () => {
   const { socket } = useSocket();
@@ -125,6 +135,12 @@ export const BystanderSOS = () => {
     );
   };
 
+  const [toast, setToast] = useState(null);
+  const showToast = (message, type = 'error', title = '') => {
+    setToast({ message, type, title });
+    setTimeout(() => setToast(null), 4500);
+  };
+
   const handleTriggerSOS = async () => {
     setIsSubmitting(true);
     try {
@@ -150,11 +166,12 @@ export const BystanderSOS = () => {
 
       const result = await EmergencyAPI.createEmergency(payload);
       if (result.success) {
+        SoundFX.playDispatchChime();
         setCreatedIncident(result.data);
         setStep('tracking_active');
       }
     } catch (err) {
-      alert('Failed to trigger SOS: ' + (err.response?.data?.error || err.message));
+      showToast(err.response?.data?.error || err.message, 'error', 'SOS Submission Error');
     } finally {
       setIsSubmitting(false);
     }
@@ -165,6 +182,22 @@ export const BystanderSOS = () => {
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
       
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed top-20 right-6 z-[99999] max-w-sm w-full bg-slate-900/95 border border-red-500/50 shadow-2xl rounded-2xl p-4 backdrop-blur-md flex items-start space-x-3 animate-fade-in">
+          <div className="p-2 rounded-xl bg-red-500/20 text-red-400 border border-red-500/30 flex-shrink-0">
+            <AlertTriangle className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="text-xs font-black text-white">{toast.title || 'Notification'}</h4>
+            <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">{toast.message}</p>
+          </div>
+          <button onClick={() => setToast(null)} className="text-slate-400 hover:text-white text-xs font-bold px-1">
+            ✕
+          </button>
+        </div>
+      )}
+
       {step === 'sos_form' ? (
         <div className="space-y-6 animate-fade-in">
           
@@ -180,6 +213,32 @@ export const BystanderSOS = () => {
             <p className="text-xs text-slate-300 max-w-md mx-auto">
               Share your location instantly. AI matches the nearest fully equipped ambulance & hospital before sirens arrive.
             </p>
+          </div>
+
+          {/* Quick City Selector */}
+          <div className="space-y-1.5">
+            <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+              Select City / Rapid Pin:
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {SOS_PRESET_CITIES.map((city, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    setLocation({
+                      latitude: city.lat,
+                      longitude: city.lon,
+                      address: city.address,
+                      accuracy: 'Rapid City GPS Pin ±5m',
+                    });
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 text-xs font-bold transition shadow-sm"
+                >
+                  {city.name}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* GPS Location Pill */}

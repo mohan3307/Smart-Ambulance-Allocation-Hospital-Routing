@@ -20,6 +20,7 @@ import { EmergencyMap } from '../components/map/EmergencyMap';
 import { XAIDecisionCard } from '../components/xai/XAIDecisionCard';
 import { EmergencyAPI } from '../services/api';
 import { useSocket } from '../context/SocketContext';
+import { SoundFX } from '../services/soundEffects';
 
 export const CommandDashboard = ({ onOpenSOS }) => {
   const { socket, lastNotification } = useSocket();
@@ -187,11 +188,15 @@ export const CommandDashboard = ({ onOpenSOS }) => {
     if (!socket) return;
 
     socket.on('incident:created', (newInc) => {
+      SoundFX.playDispatchChime();
       setIncidents((prev) => [newInc, ...prev]);
       setSelectedIncident(newInc);
     });
 
     socket.on('ambulance:position_updated', (data) => {
+      if (data.status === 'Arrived_Hospital') {
+        SoundFX.playHospitalArrivalChime();
+      }
       setAmbulances((prev) =>
         prev.map((a) =>
           (a.id || a._id).toString() === data.ambulanceId.toString()
@@ -202,6 +207,9 @@ export const CommandDashboard = ({ onOpenSOS }) => {
     });
 
     socket.on('incident:status_changed', (updatedInc) => {
+      if (updatedInc.status === 'Arrived_Hospital') {
+        SoundFX.playHospitalArrivalChime();
+      }
       setIncidents((prev) =>
         prev.map((i) =>
           (i.id || i._id || i.incidentCode) === (updatedInc.id || updatedInc._id || updatedInc.incidentCode)
@@ -272,8 +280,10 @@ export const CommandDashboard = ({ onOpenSOS }) => {
 
       const result = await EmergencyAPI.createEmergency(payload);
       if (result.success) {
+        SoundFX.playDispatchChime();
         setShowNewEmergencyModal(false);
         setSelectedIncident(result.data);
+        showToast(`Emergency ${result.data.incidentCode} triaged as ESI-${result.data.triage?.esiLevel || 2}!`, 'success', 'Emergency Logged');
         await loadData();
       }
     } catch (err) {
@@ -285,18 +295,22 @@ export const CommandDashboard = ({ onOpenSOS }) => {
 
   const handleToggleGreenCorridor = async (incId) => {
     try {
-      await EmergencyAPI.toggleGreenCorridor(incId);
+      const res = await EmergencyAPI.toggleGreenCorridor(incId);
+      setSelectedIncident(res.data);
       await loadData();
-      showToast('Green Corridor route priority synchronized across traffic beacons', 'success', 'Green Corridor Updated');
+      showToast('Smart Traffic Signals preempted to Green Wave along emergency route.', 'success', 'Green Corridor Activated');
     } catch (err) {
       showToast(err.message, 'error', 'Green Corridor Error');
     }
   };
 
-  const handleTriggerReroute = async (ambId) => {
+  const handleTriggerReroute = async (ambulanceId = null) => {
     try {
-      let targetAmbId = ambId;
-      if (!targetAmbId && selectedIncident) {
+      let targetAmbId = ambulanceId;
+      if (!targetAmbId && selectedIncident?.assignedAmbulance?.ambulanceId) {
+        targetAmbId = selectedIncident.assignedAmbulance.ambulanceId;
+      }
+      if (!targetAmbId && selectedIncident && selectedIncident.status === 'Reported') {
         // Automatically dispatch optimal unit if not assigned yet
         const dispRes = await EmergencyAPI.autoDispatch(selectedIncident.id || selectedIncident._id || selectedIncident.incidentCode);
         if (dispRes.data?.assignedAmbulance?.ambulanceId) {
@@ -309,6 +323,7 @@ export const CommandDashboard = ({ onOpenSOS }) => {
         targetAmbId = firstActive ? (firstActive.id || firstActive._id) : null;
       }
       if (targetAmbId) {
+        SoundFX.playSirenChirp();
         const res = await EmergencyAPI.triggerTrafficSpike(targetAmbId);
         showToast(
           res.rerouteDetails?.rerouteReason || 'Corridor traffic spike detected. Calculated dynamic bypass detour!',
@@ -324,6 +339,7 @@ export const CommandDashboard = ({ onOpenSOS }) => {
 
   const handleAutoDispatch = async (incId) => {
     try {
+      SoundFX.playDispatchChime();
       const res = await EmergencyAPI.autoDispatch(incId);
       setSelectedIncident(res.data);
       await loadData();
@@ -436,6 +452,40 @@ export const CommandDashboard = ({ onOpenSOS }) => {
         
         {/* Map View (7 cols) */}
         <div className="lg:col-span-7 flex flex-col space-y-3">
+          
+          {/* Golden Hour Survival Protocol Banner */}
+          {selectedIncident && selectedIncident.status !== 'Resolved' && (selectedIncident.triage?.esiLevel || 2) <= 2 && (
+            <div className="bg-gradient-to-r from-red-950/80 via-slate-900 to-red-950/80 border border-red-500/50 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 shadow-lg animate-fade-in">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-3 h-3 rounded-full bg-red-500 animate-ping flex-shrink-0" />
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-black text-red-400 uppercase tracking-wider">
+                      🚨 Golden Hour Protocol Active
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded font-black bg-red-600 text-white">
+                      ESI {selectedIncident.triage?.esiLevel || 1}
+                    </span>
+                    <span className="text-xs font-bold text-white">
+                      {selectedIncident.incidentCode}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    {selectedIncident.targetHospital?.name
+                      ? `Critical Cath Lab / ER Bay allocated at ${selectedIncident.targetHospital.name}. Transit priority locked.`
+                      : 'Immediate ambulance match & hospital cath lab allocation required within 60-minute window.'}
+                  </p>
+                </div>
+              </div>
+              <div className="bg-slate-950/80 border border-red-500/30 px-2.5 py-1 rounded-lg text-right">
+                <div className="text-[9px] text-slate-400 font-bold uppercase">Time in Golden Window</div>
+                <div className="text-xs font-black text-amber-400 font-mono">
+                  ⏱️ 41m 20s Left
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between bg-slate-900 border border-slate-800 px-4 py-2.5 rounded-xl">
             <div className="flex items-center space-x-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>

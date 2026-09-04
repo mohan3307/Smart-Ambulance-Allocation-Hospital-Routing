@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { EmergencyAPI } from '../services/api';
 import { useSocket } from '../context/SocketContext';
+import { SoundFX } from '../services/soundEffects';
 
 export const HospitalERView = () => {
   const { socket } = useSocket();
@@ -23,6 +24,14 @@ export const HospitalERView = () => {
   const [incidents, setIncidents] = useState([]);
   const [isUpdating, setIsUpdating] = useState(false);
   const [bayNotification, setBayNotification] = useState('');
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = 'info', title = '') => {
+    setToast({ message, type, title });
+    setTimeout(() => {
+      setToast((curr) => (curr?.message === message ? null : curr));
+    }, 4500);
+  };
 
   // Editable bed form
   const [erAvailable, setErAvailable] = useState(5);
@@ -77,9 +86,9 @@ export const HospitalERView = () => {
         diversionStatus: diversion,
       });
       await loadData();
-      alert('Hospital bed capacity updated! Central AI allocator synchronized.');
+      showToast('Hospital bed capacity updated! Central AI allocator synchronized.', 'success', 'Capacity Synchronized');
     } catch (err) {
-      alert('Error updating beds: ' + err.message);
+      showToast(err.message, 'error', 'Error Updating Beds');
     } finally {
       setIsUpdating(false);
     }
@@ -88,10 +97,12 @@ export const HospitalERView = () => {
   const handlePrepareBay = async (bayName, incidentCode) => {
     try {
       await EmergencyAPI.prepareBay(selectedHospitalId, bayName, incidentCode);
+      SoundFX.playHospitalArrivalChime();
+      showToast(`Confirmed: ${bayName} prepared and staffed for ${incidentCode}!`, 'success', 'Trauma Bay Ready');
       setBayNotification(`Confirmed: ${bayName} prepared and staffed for ${incidentCode}!`);
       setTimeout(() => setBayNotification(''), 6000);
     } catch (err) {
-      alert('Error preparing bay: ' + err.message);
+      showToast(err.message, 'error', 'Error Preparing Bay');
     }
   };
 
@@ -105,6 +116,29 @@ export const HospitalERView = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed top-20 right-6 z-[99999] max-w-sm w-full bg-slate-900/95 border border-slate-700 shadow-2xl rounded-2xl p-4 backdrop-blur-md flex items-start space-x-3 animate-fade-in">
+          <div className={`p-2 rounded-xl flex-shrink-0 ${
+            toast.type === 'warning' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+            toast.type === 'success' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+            'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+          }`}>
+            <Activity className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="text-xs font-black text-white">{toast.title || 'Notification'}</h4>
+            <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">{toast.message}</p>
+          </div>
+          <button
+            onClick={() => setToast(null)}
+            className="text-slate-400 hover:text-white text-xs font-bold px-1"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       
       {/* Header & Hospital Selector */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-wrap items-center justify-between gap-4">

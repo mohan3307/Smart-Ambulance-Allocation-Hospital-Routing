@@ -10,12 +10,16 @@ import {
   Cpu, 
   BarChart3,
   Wifi,
-  WifiOff
+  WifiOff,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { useSocket } from '../../context/SocketContext';
+import { SoundFX } from '../../services/soundEffects';
 
 export const Navbar = ({ activeView, setActiveView, systemStats, activeIncidentCount = 0 }) => {
   const { connected } = useSocket();
+  const [soundOn, setSoundOn] = React.useState(SoundFX.isSoundEnabled());
   const isAiOptimized = systemStats?.system?.aiEngine === 'ai_optimized';
 
   const navItems = [
@@ -94,6 +98,22 @@ export const Navbar = ({ activeView, setActiveView, systemStats, activeIncidentC
               <span className="hidden sm:inline">Engine:</span>
               <span className="font-semibold">{isAiOptimized ? 'AI-Optimized' : 'Rules Fallback'}</span>
             </div>
+
+            {/* Sound Toggle Button */}
+            <button
+              onClick={() => {
+                const newState = SoundFX.toggleSound();
+                setSoundOn(newState);
+              }}
+              title={soundOn ? 'EMS Audio Alerts Active (Click to Mute)' : 'EMS Audio Muted (Click to Unmute)'}
+              className={`p-1.5 rounded-lg border text-xs font-bold transition flex items-center space-x-1 ${
+                soundOn
+                  ? 'bg-blue-600/20 text-blue-400 border-blue-500/40 hover:bg-blue-600/30'
+                  : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
+              }`}
+            >
+              {soundOn ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+            </button>
 
             {/* Socket Live Indicator */}
             <div className="flex items-center space-x-1 px-2 py-1 rounded-full bg-slate-800/80 border border-slate-700 text-[11px] text-slate-300">
