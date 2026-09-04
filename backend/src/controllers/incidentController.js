@@ -90,23 +90,23 @@ export const createEmergencyIncident = async (req, res) => {
     const ambStartLat = fullAmbulanceObj?.location?.latitude || location.latitude + 0.02;
     const ambStartLon = fullAmbulanceObj?.location?.longitude || location.longitude - 0.02;
 
-    const routeToScene = RoutingSimulator.generateRouteCoordinates(
+    const routeToSceneRes = await RoutingSimulator.getRealRoadRoute(
       ambStartLat,
       ambStartLon,
       location.latitude,
-      location.longitude,
-      18
+      location.longitude
     );
 
-    const routeToHosp = RoutingSimulator.generateRouteCoordinates(
+    const routeToHospRes = await RoutingSimulator.getRealRoadRoute(
       location.latitude,
       location.longitude,
       selectedHosp.latitude || 12.9716,
-      selectedHosp.longitude || 77.5946,
-      22
+      selectedHosp.longitude || 77.5946
     );
 
-    const fullActiveRoute = [...routeToScene, ...routeToHosp.slice(1)];
+    const fullActiveRoute = [...routeToSceneRes.coordinates, ...routeToHospRes.coordinates.slice(1)];
+    const totalDistanceKm = Math.round((routeToSceneRes.distanceKm + routeToHospRes.distanceKm) * 10) / 10;
+    const totalDurationMinutes = Math.round((routeToSceneRes.durationMinutes + routeToHospRes.durationMinutes) * 10) / 10;
 
     // Construct new Incident
     const incidentData = {
@@ -330,21 +330,20 @@ export const autoDispatchIncident = async (req, res) => {
     const ambStartLat = ambObj?.location?.latitude || incident.location.latitude + 0.015;
     const ambStartLon = ambObj?.location?.longitude || incident.location.longitude - 0.015;
 
-    const routeToScene = RoutingSimulator.generateRouteCoordinates(
+    const routeToSceneRes = await RoutingSimulator.getRealRoadRoute(
       ambStartLat,
       ambStartLon,
       incident.location.latitude,
-      incident.location.longitude,
-      18
+      incident.location.longitude
     );
-    const routeToHosp = RoutingSimulator.generateRouteCoordinates(
+    const routeToHospRes = await RoutingSimulator.getRealRoadRoute(
       incident.location.latitude,
       incident.location.longitude,
       selectedHosp.latitude || 12.9716,
-      selectedHosp.longitude || 77.5946,
-      22
+      selectedHosp.longitude || 77.5946
     );
-    const fullActiveRoute = [...routeToScene, ...routeToHosp.slice(1)];
+    const fullActiveRoute = [...routeToSceneRes.coordinates, ...routeToHospRes.coordinates.slice(1)];
+    const totalDistanceKm = Math.round((routeToSceneRes.distanceKm + routeToHospRes.distanceKm) * 10) / 10;
 
     const updated = await DataStore.updateIncident(id, {
       status: 'Dispatched',

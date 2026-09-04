@@ -133,14 +133,20 @@ export const triggerDynamicReroute = async (req, res) => {
     const currentPos = amb.activeRoute[currentIndex] || amb.activeRoute[0];
     const destination = amb.activeRoute[amb.activeRoute.length - 1];
 
-    // Generate smart detour bypassing congestion
-    const alternativeDetour = RoutingSimulator.generateAlternativeRoute(
+    // Generate smart road detour bypassing congestion
+    const detourDir = Math.random() > 0.5 ? 1 : -1;
+    const viaLat = (currentPos.latitude + destination.latitude) / 2 + 0.010 * detourDir;
+    const viaLon = (currentPos.longitude + destination.longitude) / 2 - 0.008 * detourDir;
+
+    const detourResult = await RoutingSimulator.getRealRoadRoute(
       currentPos.latitude,
       currentPos.longitude,
       destination.latitude,
       destination.longitude,
-      Math.random() > 0.5 ? 1 : -1
+      viaLat,
+      viaLon
     );
+    const alternativeDetour = detourResult.coordinates;
 
     // Splice into new active route
     const newRoute = [...amb.activeRoute.slice(0, currentIndex), ...alternativeDetour];

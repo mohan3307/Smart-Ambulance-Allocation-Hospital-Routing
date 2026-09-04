@@ -115,18 +115,18 @@ export const seedHospitals = [
 
 function makeRoute(startLat, startLon, midLat, midLon, endLat, endLon) {
   const pts = [];
-  const n = 12;
+  const n = 16;
   for (let i = 0; i <= n; i++) {
     const t = i / n;
     pts.push({
-      latitude: parseFloat((startLat + (midLat - startLat) * t + Math.sin(t * Math.PI) * 0.002).toFixed(6)),
+      latitude: parseFloat((startLat + (midLat - startLat) * t).toFixed(6)),
       longitude: parseFloat((startLon + (midLon - startLon) * t).toFixed(6)),
     });
   }
   for (let i = 1; i <= n; i++) {
     const t = i / n;
     pts.push({
-      latitude: parseFloat((midLat + (endLat - midLat) * t - Math.sin(t * Math.PI) * 0.002).toFixed(6)),
+      latitude: parseFloat((midLat + (endLat - midLat) * t).toFixed(6)),
       longitude: parseFloat((midLon + (endLon - midLon) * t).toFixed(6)),
     });
   }

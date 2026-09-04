@@ -42,25 +42,56 @@ const MAP_LAYERS = {
 // Custom SVG DivIcons to ensure reliable rendering across all environments
 const createAmbulanceIcon = (ambulance) => {
   const isAvailable = ambulance.status === 'Available';
-  const color = isAvailable ? '#10B981' : '#06B6D4'; // Green or Cyan
-  const pulse = !isAvailable ? 'animation: pulse 1.5s infinite;' : '';
+  const color = isAvailable ? '#10B981' : '#06B6D4'; // Green or Neon Cyan
+  const speed = ambulance.location?.speedKmH || ambulance.speedKmH || 48;
+
+  // For active en-route ambulances, show animated sonar radar waves & dual emergency strobe
+  const radarWave = !isAvailable
+    ? `<div style="position: absolute; width: 68px; height: 68px; top: -14px; left: -14px; border-radius: 50%; border: 2px solid #06B6D4; opacity: 0.8; animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite; pointer-events: none;"></div>
+       <div style="position: absolute; width: 88px; height: 88px; top: -24px; left: -24px; border-radius: 50%; background: radial-gradient(circle, rgba(6,182,212,0.3) 0%, rgba(6,182,212,0) 70%); pointer-events: none;"></div>`
+    : '';
+
+  const strobeLights = !isAvailable
+    ? `<div style="position: absolute; top: -7px; display: flex; gap: 4px; z-index: 20;">
+         <div style="width: 7px; height: 7px; background: #EF4444; border-radius: 50%; box-shadow: 0 0 10px #EF4444; animation: pulse 0.5s infinite alternate;"></div>
+         <div style="width: 7px; height: 7px; background: #3B82F6; border-radius: 50%; box-shadow: 0 0 10px #3B82F6; animation: pulse 0.5s infinite alternate 0.25s;"></div>
+       </div>`
+    : '';
 
   return L.divIcon({
     className: 'custom-amb-marker',
     html: `
       <div style="position: relative; display: flex; flex-direction: column; align-items: center;">
-        <div style="background: ${color}; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2.5px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.6); ${pulse}">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        ${radarWave}
+        ${strobeLights}
+        <div style="background: ${color}; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 3px solid #ffffff; box-shadow: 0 4px 18px rgba(0,0,0,0.8); z-index: 10;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M19 14h-4v4h-6v-4H5v-6h4V4h6v4h4v6z"/>
           </svg>
         </div>
-        <div style="margin-top: 2px; background: rgba(15, 23, 42, 0.9); color: white; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; border: 1px solid #334155; white-space: nowrap;">
-          ${ambulance.callSign.split(' ')[0]}
+        <div style="margin-top: 3px; background: #0F172A; color: white; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 6px; border: 1.5px solid ${isAvailable ? '#10B981' : '#06B6D4'}; box-shadow: 0 3px 10px rgba(0,0,0,0.8); white-space: nowrap; z-index: 10; display: flex; align-items: center; gap: 4px;">
+          <span>${ambulance.callSign.split(' ')[0]}</span>
+          ${!isAvailable ? `<span style="color: #38BDF8; font-size: 9px; font-weight: 900;">• ${speed}km/h</span>` : ''}
         </div>
       </div>
     `,
-    iconSize: [34, 52],
-    iconAnchor: [17, 26],
+    iconSize: [40, 62],
+    iconAnchor: [20, 20],
+  });
+};
+
+const createDistanceBadgeIcon = (remainingKm, etaMin) => {
+  return L.divIcon({
+    className: 'custom-dist-badge',
+    html: `
+      <div style="background: rgba(15, 23, 42, 0.95); border: 2px solid #06B6D4; color: #FFFFFF; font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 9999px; box-shadow: 0 4px 14px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 5px; white-space: nowrap; pointer-events: none;">
+        <span style="color: #38BDF8;">🛣️ ${remainingKm} km</span>
+        <span style="color: #64748B;">|</span>
+        <span style="color: #34D399;">⏱️ ${etaMin} min</span>
+      </div>
+    `,
+    iconSize: [115, 28],
+    iconAnchor: [57, 14],
   });
 };
 
@@ -138,18 +169,91 @@ export const EmergencyMap = ({
 }) => {
   const [mapLayer, setMapLayer] = useState('google_streets');
 
-  // Extract active ambulance routes for polyline display
+  // Extract active ambulance routes with live remaining distance & ETA calculations
   const activeRoutes = ambulances
     .filter((a) => a.activeRoute && a.activeRoute.length > 0)
-    .map((a) => ({
-      ambulanceId: a.id || a._id,
-      callSign: a.callSign,
-      coordinates: a.activeRoute.map((pt) => [pt.latitude, pt.longitude]),
-      color: a.trafficDelayFactor > 1.2 ? '#EF4444' : '#06B6D4',
-    }));
+    .map((a) => {
+      let remainingKm = 0;
+      const curIdx = a.routeProgressIndex || 0;
+      for (let i = curIdx; i < a.activeRoute.length - 1; i++) {
+        const p1 = a.activeRoute[i];
+        const p2 = a.activeRoute[i + 1];
+        const dLat = ((p2.latitude - p1.latitude) * Math.PI) / 180;
+        const dLon = ((p2.longitude - p1.longitude) * Math.PI) / 180;
+        const sa =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos((p1.latitude * Math.PI) / 180) *
+            Math.cos((p2.latitude * Math.PI) / 180) *
+            Math.sin(dLon / 2) *
+            Math.sin(dLon / 2);
+        remainingKm += 6371 * 2 * Math.atan2(Math.sqrt(sa), Math.sqrt(1 - sa));
+      }
+      const speed = a.location?.speedKmH || a.speedKmH || 48;
+      const etaMin = Math.max(1, Math.round((remainingKm / speed) * 60));
+
+      return {
+        ambulanceId: a.id || a._id,
+        callSign: a.callSign,
+        coordinates: a.activeRoute.map((pt) => [pt.latitude, pt.longitude]),
+        color: a.trafficDelayFactor > 1.05 ? '#F59E0B' : '#06B6D4',
+        remainingKm: Math.max(0.3, Math.round(remainingKm * 10) / 10),
+        etaMin,
+        speed,
+        status: a.status || 'En_Route',
+      };
+    });
+
+  const primaryRoute = activeRoutes[0] || null;
 
   return (
     <div className="relative w-full h-full min-h-[460px] rounded-xl overflow-hidden border border-slate-800 shadow-2xl z-0 isolate">
+      
+      {/* Floating Mission Navigation HUD (Distance & ETA) */}
+      {primaryRoute && (
+        <div className="absolute top-3 left-3 z-[400] bg-slate-900/95 border border-cyan-500/50 rounded-2xl p-3 shadow-2xl backdrop-blur-md max-w-[260px] text-xs space-y-2 pointer-events-auto">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+            <div className="flex items-center space-x-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
+              <span className="font-black text-white uppercase tracking-wider text-[10px]">
+                Live Mission Route
+              </span>
+            </div>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+              {primaryRoute.callSign}
+            </span>
+          </div>
+
+          {/* Metric Highlights */}
+          <div className="grid grid-cols-3 gap-1.5 text-center">
+            <div className="bg-slate-800/90 rounded-xl p-1.5 border border-slate-700">
+              <div className="text-[9px] text-slate-400 font-bold uppercase">Distance</div>
+              <div className="text-sm font-black text-cyan-400">
+                {primaryRoute.remainingKm} <span className="text-[9px] font-normal text-slate-400">km</span>
+              </div>
+            </div>
+            <div className="bg-slate-800/90 rounded-xl p-1.5 border border-slate-700">
+              <div className="text-[9px] text-slate-400 font-bold uppercase">ETA</div>
+              <div className="text-sm font-black text-emerald-400">
+                {primaryRoute.etaMin} <span className="text-[9px] font-normal text-slate-400">min</span>
+              </div>
+            </div>
+            <div className="bg-slate-800/90 rounded-xl p-1.5 border border-slate-700">
+              <div className="text-[9px] text-slate-400 font-bold uppercase">Speed</div>
+              <div className="text-sm font-black text-amber-400">
+                {primaryRoute.speed} <span className="text-[9px] font-normal text-slate-400">km/h</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between text-[10px] pt-0.5">
+            <span className="text-slate-400 font-medium">Status:</span>
+            <span className="font-bold text-white px-2 py-0.5 rounded bg-cyan-950 border border-cyan-500/30 text-[10px]">
+              {primaryRoute.status.replace(/_/g, ' ')}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Floating Google Maps Layer Switcher */}
       <div className="absolute top-3 right-3 z-[400] bg-slate-900/90 backdrop-blur border border-slate-700 p-1 rounded-xl text-xs shadow-2xl flex items-center space-x-1">
         <button
@@ -214,20 +318,44 @@ export const EmergencyMap = ({
 
         <MapRecenter center={center} />
 
-        {/* Polylines for Active Dispatches */}
-        {activeRoutes.map((route, idx) => (
-          <Polyline
-            key={idx}
-            positions={route.coordinates}
-            pathOptions={{
-              color: route.color,
-              weight: 5,
-              opacity: 0.85,
-              dashArray: '8, 8',
-              lineCap: 'round',
-            }}
-          />
-        ))}
+        {/* Polylines for Active Dispatches (Google Maps Dual-Layer & Midpoint Badges) */}
+        {activeRoutes.map((route, idx) => {
+          const midCoord = route.coordinates[Math.floor(route.coordinates.length / 2)];
+          return (
+            <React.Fragment key={idx}>
+              {/* Outer Casing Outline */}
+              <Polyline
+                positions={route.coordinates}
+                pathOptions={{
+                  color: '#020617',
+                  weight: 9,
+                  opacity: 0.9,
+                  lineCap: 'round',
+                  lineJoin: 'round',
+                }}
+              />
+              {/* Core Glowing Line */}
+              <Polyline
+                positions={route.coordinates}
+                pathOptions={{
+                  color: route.color,
+                  weight: 5,
+                  opacity: 0.95,
+                  lineCap: 'round',
+                  lineJoin: 'round',
+                }}
+              />
+              {/* Distance & ETA Badge along Route */}
+              {midCoord && (
+                <Marker
+                  position={midCoord}
+                  icon={createDistanceBadgeIcon(route.remainingKm, route.etaMin)}
+                  interactive={false}
+                />
+              )}
+            </React.Fragment>
+          );
+        })}
 
         {/* Traffic Congestion Zones (Simulated City Corridors) */}
         {showTrafficOverlay && (
