@@ -80,10 +80,15 @@ setInterval(async () => {
 
         let newStatus = amb.status;
         const sceneWaypointIndex = Math.floor(amb.activeRoute.length * 0.45);
-        if (currentIndex >= sceneWaypointIndex && amb.status === 'En_Route_Scene') {
+        if (currentIndex >= sceneWaypointIndex && currentIndex < sceneWaypointIndex + 2 && amb.status === 'En_Route_Scene') {
           newStatus = 'On_Scene';
           if (amb.currentIncidentId) {
             await DataStore.updateIncident(amb.currentIncidentId, { status: 'On_Scene' });
+          }
+        } else if (currentIndex >= sceneWaypointIndex + 2 && (amb.status === 'En_Route_Scene' || amb.status === 'On_Scene')) {
+          newStatus = 'En_Route_Hospital';
+          if (amb.currentIncidentId) {
+            await DataStore.updateIncident(amb.currentIncidentId, { status: 'En_Route_Hospital' });
           }
         } else if (currentIndex >= maxIndex) {
           newStatus = 'Arrived_Hospital';
