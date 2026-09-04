@@ -31,6 +31,14 @@ export const CommandDashboard = ({ onOpenSOS }) => {
   const [showNewEmergencyModal, setShowNewEmergencyModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showXAIDialog, setShowXAIDialog] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = 'info', title = '') => {
+    setToast({ message, type, title });
+    setTimeout(() => {
+      setToast((curr) => (curr?.message === message ? null : curr));
+    }, 4500);
+  };
 
   // New emergency form state
   const [formData, setFormData] = useState({
@@ -230,7 +238,7 @@ export const CommandDashboard = ({ onOpenSOS }) => {
         await loadData();
       }
     } catch (err) {
-      alert(`Dispatch Error: ${err.response?.data?.error || err.message}`);
+      showToast(err.response?.data?.error || err.message, 'error', 'Dispatch Error');
     } finally {
       setIsSubmitting(false);
     }
@@ -240,8 +248,9 @@ export const CommandDashboard = ({ onOpenSOS }) => {
     try {
       await EmergencyAPI.toggleGreenCorridor(incId);
       await loadData();
+      showToast('Green Corridor route priority synchronized across traffic beacons', 'success', 'Green Corridor Updated');
     } catch (err) {
-      alert('Failed to toggle green corridor: ' + err.message);
+      showToast(err.message, 'error', 'Green Corridor Error');
     }
   };
 
@@ -262,11 +271,15 @@ export const CommandDashboard = ({ onOpenSOS }) => {
       }
       if (targetAmbId) {
         const res = await EmergencyAPI.triggerTrafficSpike(targetAmbId);
-        alert(res.rerouteDetails?.rerouteReason || 'Dynamic bypass route calculated!');
+        showToast(
+          res.rerouteDetails?.rerouteReason || 'Corridor traffic spike detected. Calculated dynamic bypass detour!',
+          'warning',
+          'Dynamic Reroute Triggered'
+        );
         await loadData();
       }
     } catch (err) {
-      alert('Reroute trigger: ' + (err.response?.data?.error || err.message));
+      showToast(err.response?.data?.error || err.message, 'error', 'Reroute Simulation Error');
     }
   };
 
@@ -275,9 +288,13 @@ export const CommandDashboard = ({ onOpenSOS }) => {
       const res = await EmergencyAPI.autoDispatch(incId);
       setSelectedIncident(res.data);
       await loadData();
-      alert(`Dispatched ${res.ambulance.call_sign} to incident! Target Hospital: ${res.hospital.name}`);
+      showToast(
+        `Dispatched ${res.ambulance?.call_sign || 'Ambulance'} to emergency. Destination: ${res.hospital?.name || 'Hospital'}`,
+        'success',
+        'Auto-Dispatch Completed'
+      );
     } catch (err) {
-      alert('Auto-dispatch error: ' + err.message);
+      showToast(err.message, 'error', 'Auto-Dispatch Error');
     }
   };
 
@@ -287,6 +304,29 @@ export const CommandDashboard = ({ onOpenSOS }) => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       
+      {/* Modern Non-Blocking In-App Toast */}
+      {toast && (
+        <div className="fixed top-20 right-6 z-[99999] max-w-sm w-full bg-slate-900/95 border border-slate-700 shadow-2xl rounded-2xl p-4 backdrop-blur-md flex items-start space-x-3 animate-fade-in">
+          <div className={`p-2 rounded-xl flex-shrink-0 ${
+            toast.type === 'warning' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+            toast.type === 'success' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+            'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+          }`}>
+            <Zap className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="text-xs font-black text-white">{toast.title || 'System Notification'}</h4>
+            <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">{toast.message}</p>
+          </div>
+          <button
+            onClick={() => setToast(null)}
+            className="text-slate-400 hover:text-white text-xs font-bold px-1"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Top Banner Alert (if notification exists) */}
       {lastNotification && (
         <div className="bg-amber-950/60 border border-amber-500/50 rounded-xl p-3 flex items-center justify-between animate-fade-in shadow-lg">
