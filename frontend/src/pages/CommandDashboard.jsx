@@ -17,7 +17,14 @@ import {
   Info,
   Maximize2,
   Minimize2,
-  RotateCcw
+  RotateCcw,
+  MapPin,
+  Clock,
+  ArrowRight,
+  HeartPulse,
+  Filter,
+  CheckCircle2,
+  AlertTriangle
 } from 'lucide-react';
 import { EmergencyMap } from '../components/map/EmergencyMap';
 import { XAIDecisionCard } from '../components/xai/XAIDecisionCard';
@@ -38,6 +45,8 @@ export const CommandDashboard = ({ onOpenSOS }) => {
   const [showXAIDialog, setShowXAIDialog] = useState(false);
   const [toast, setToast] = useState(null);
   const [isFullMap, setIsFullMap] = useState(false);
+  const [cadPanelTab, setCadPanelTab] = useState('detail'); // 'detail' | 'queue' | 'split'
+  const [queueFilter, setQueueFilter] = useState('all'); // 'all' | 'critical' | 'enroute'
 
   const showToast = (message, type = 'info', title = '') => {
     setToast({ message, type, title });
@@ -483,6 +492,15 @@ export const CommandDashboard = ({ onOpenSOS }) => {
 
   const availableAmbulances = ambulances.filter((a) => a.status === 'Available');
   const enRouteAmbulances = ambulances.filter((a) => a.status !== 'Available');
+  const filteredIncidents = incidents.filter((i) => {
+    if (queueFilter === 'critical') {
+      return (i.triage?.esiLevel || 3) <= 2;
+    }
+    if (queueFilter === 'enroute') {
+      return i.status === 'En_Route_Scene' || i.status === 'En_Route_Hospital' || i.status === 'On_Scene';
+    }
+    return true;
+  });
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
@@ -618,15 +636,47 @@ export const CommandDashboard = ({ onOpenSOS }) => {
             </div>
           )}
 
-          <div className="flex items-center justify-between bg-slate-900 border border-slate-800 px-4 py-2.5 rounded-xl">
-            <div className="flex items-center space-x-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
-              <span className="font-bold text-xs text-slate-200">METROPOLITAN LIVE CAD GIS MAP</span>
+          {/* CAD Live Radar Header */}
+          <div className="flex flex-wrap items-center justify-between bg-slate-900/90 border border-slate-800 px-4 py-3 rounded-2xl shadow-lg gap-2.5 backdrop-blur-sm">
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <span className="font-black text-xs text-white uppercase tracking-wider">CAD LIVE RADAR</span>
+              </div>
+              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-800/90 text-slate-300 border border-slate-700 hidden sm:inline">
+                {selectedRegionId} Sector Active
+              </span>
             </div>
             <div className="flex items-center space-x-2 text-xs">
               <button
+                onClick={handleResetDemoData}
+                className="px-2.5 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-amber-300 border border-slate-700 transition flex items-center space-x-1 shadow-sm"
+                title="Reset All Live Data to Clean Initial State (Clears stale dispatches)"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-[11px] font-bold hidden md:inline">Reset Fleet</span>
+              </button>
+              <button
+                onClick={handleSimulateMultiCallConflict}
+                className="px-3 py-1.5 rounded-xl bg-purple-600/90 hover:bg-purple-500 text-white font-bold transition shadow-md shadow-purple-600/20 border border-purple-500/40 flex items-center space-x-1.5"
+                title="Simulate 2 Simultaneous Emergencies & Multi-Ambulance Reallocation"
+              >
+                <Zap className="w-3.5 h-3.5" />
+                <span className="text-[11px] hidden sm:inline">Conflict Test</span>
+              </button>
+              <button
+                onClick={() => setShowNewEmergencyModal(true)}
+                className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-black transition shadow-lg shadow-red-600/30 flex items-center space-x-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span className="text-[11px]">+ Intake Call</span>
+              </button>
+              <button
                 onClick={() => setIsFullMap(!isFullMap)}
-                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg font-bold transition shadow-lg ${
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-bold transition shadow-md ${
                   isFullMap
                     ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/30 ring-2 ring-amber-400'
                     : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-600/30'
@@ -634,36 +684,7 @@ export const CommandDashboard = ({ onOpenSOS }) => {
                 title={isFullMap ? "Exit Full Map View" : "Expand to Full Map View"}
               >
                 {isFullMap ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-                <span>{isFullMap ? 'Exit Full Map' : '⛶ Full Map'}</span>
-              </button>
-              <button
-                onClick={handleSimulateMultiCallConflict}
-                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold transition shadow-lg shadow-purple-600/30"
-                title="Simulate 2 Simultaneous Emergencies & Multi-Ambulance Reallocation"
-              >
-                <Zap className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Multi-Call Conflict Demo</span>
-              </button>
-              <button
-                onClick={() => setShowNewEmergencyModal(true)}
-                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold transition shadow-lg shadow-red-600/30"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Simulate Call Intake</span>
-              </button>
-              <button
-                onClick={loadData}
-                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
-                title="Refresh Map"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={handleResetDemoData}
-                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 border border-slate-700"
-                title="Reset All Live Data to Clean Initial State (Clears stale dispatches)"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
+                <span className="text-[11px] hidden sm:inline">{isFullMap ? 'Exit Full' : 'Full Map'}</span>
               </button>
             </div>
           </div>
@@ -676,7 +697,10 @@ export const CommandDashboard = ({ onOpenSOS }) => {
               activeIncident={selectedIncident}
               selectedRegionId={selectedRegionId}
               onRegionChange={(reg) => setSelectedRegionId(reg.id)}
-              onSelectIncident={(inc) => setSelectedIncident(inc)}
+              onSelectIncident={(inc) => {
+                setSelectedIncident(inc);
+                setCadPanelTab('detail');
+              }}
               isFullMap={isFullMap}
               onToggleFullMap={() => setIsFullMap(!isFullMap)}
             />
@@ -684,174 +708,396 @@ export const CommandDashboard = ({ onOpenSOS }) => {
         </div>
 
         {/* Dispatch Queue & Selected Incident Detail */}
-        <div className={`${isFullMap ? 'lg:col-span-12 grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2' : 'lg:col-span-5 flex flex-col space-y-4'}`}>
+        <div className={`${isFullMap ? 'lg:col-span-12 grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4' : 'lg:col-span-5 flex flex-col space-y-4'}`}>
           
-          {/* Active Incidents Queue */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
-              <div className="flex items-center space-x-2">
-                <ShieldAlert className="w-4 h-4 text-red-500" />
-                <span className="font-bold text-xs text-slate-200 uppercase tracking-wider">
-                  Live Emergency Dispatch Queue ({incidents.length})
-                </span>
-              </div>
+          {/* Segmented Tab Navigation Controller */}
+          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-1.5 shadow-xl backdrop-blur-sm flex items-center justify-between gap-1.5">
+            <div className="flex items-center space-x-1.5 flex-1">
               <button
-                onClick={onOpenSOS}
-                className="text-[11px] font-bold text-red-400 hover:text-red-300 underline"
+                type="button"
+                onClick={() => setCadPanelTab('queue')}
+                className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-2 ${
+                  cadPanelTab === 'queue'
+                    ? 'bg-red-600 text-white shadow-lg shadow-red-600/30 ring-1 ring-red-400'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
               >
-                Open Bystander SOS Mode &rarr;
+                <ShieldAlert className="w-3.5 h-3.5" />
+                <span>Live Queue</span>
+                <span className={`px-2 py-0.2 rounded-full text-[10px] font-black ${
+                  cadPanelTab === 'queue' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-300'
+                }`}>
+                  {incidents.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCadPanelTab('detail')}
+                className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-2 ${
+                  cadPanelTab === 'detail'
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30 ring-1 ring-blue-400'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <Radio className="w-3.5 h-3.5" />
+                <span>Mission Console</span>
+                {selectedIncident && (
+                  <span className="hidden sm:inline font-mono text-[10px] text-blue-200">
+                    {selectedIncident.incidentCode}
+                  </span>
+                )}
               </button>
             </div>
 
-            <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
-              {incidents.map((inc) => {
-                const isSelected = selectedIncident?.incidentCode === inc.incidentCode;
-                const esi = inc.triage?.esiLevel || 3;
-                const esiColor = esi === 1 ? 'border-red-500 bg-red-950/30' : esi === 2 ? 'border-orange-500 bg-orange-950/20' : 'border-yellow-500 bg-yellow-950/20';
+            {/* Split Dual-Pane View Switcher */}
+            <button
+              type="button"
+              onClick={() => setCadPanelTab(cadPanelTab === 'split' ? 'detail' : 'split')}
+              className={`px-2.5 py-2 rounded-xl text-xs font-bold transition hidden sm:flex items-center space-x-1 border ${
+                cadPanelTab === 'split'
+                  ? 'bg-cyan-950/60 text-cyan-300 border-cyan-500/40 ring-1 ring-cyan-500/30'
+                  : 'text-slate-400 border-slate-800 hover:text-slate-200 hover:bg-slate-800/50'
+              }`}
+              title="Toggle Split Dual-Pane View"
+            >
+              <Sliders className="w-3.5 h-3.5" />
+              <span className="text-[10px]">{cadPanelTab === 'split' ? 'Split Active' : 'Split'}</span>
+            </button>
+          </div>
 
-                return (
-                  <div
-                    key={inc.incidentCode}
-                    onClick={() => setSelectedIncident(inc)}
-                    className={`p-3 rounded-xl border transition-all cursor-pointer ${
-                      isSelected
-                        ? 'border-cyan-500 bg-slate-800/90 ring-1 ring-cyan-500 shadow-md'
-                        : `${esiColor} hover:bg-slate-800/50`
+          {/* Active Incidents Queue (Visible if tab is 'queue' or 'split') */}
+          {(cadPanelTab === 'queue' || cadPanelTab === 'split') && (
+            <div className={`bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl backdrop-blur-sm flex flex-col ${cadPanelTab === 'queue' ? 'min-h-[520px]' : ''}`}>
+              <div className="flex flex-wrap items-center justify-between border-b border-slate-800/80 pb-3 mb-3 gap-2">
+                <div className="flex items-center space-x-2">
+                  <span className="font-black text-xs text-white uppercase tracking-wider">
+                    Emergency Dispatch Queue ({filteredIncidents.length})
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-1 bg-slate-950/60 p-1 rounded-xl border border-slate-800 text-[10px]">
+                    <button
+                      type="button"
+                      onClick={() => setQueueFilter('all')}
+                      className={`px-2 py-0.5 rounded-lg font-bold transition ${queueFilter === 'all' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                    >
+                      All ({incidents.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQueueFilter('critical')}
+                      className={`px-2 py-0.5 rounded-lg font-bold transition ${queueFilter === 'critical' ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-red-400'}`}
+                    >
+                      Critical ESI-1/2
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQueueFilter('enroute')}
+                      className={`px-2 py-0.5 rounded-lg font-bold transition ${queueFilter === 'enroute' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-blue-400'}`}
+                    >
+                      En Route
+                    </button>
+                  </div>
+                  <button
+                    onClick={onOpenSOS}
+                    className="text-[11px] font-bold text-red-400 hover:text-red-300 underline whitespace-nowrap pl-1"
+                  >
+                    SOS Mode &rarr;
+                  </button>
+                </div>
+              </div>
+
+              {/* Scrollable Incident Cards List */}
+              <div className={`space-y-3 overflow-y-auto pr-1.5 flex-1 ${cadPanelTab === 'queue' ? 'max-h-[520px]' : 'max-h-72'}`}>
+                {filteredIncidents.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 text-xs border border-dashed border-slate-800 rounded-xl">
+                    No emergency incidents matching this filter.
+                  </div>
+                ) : (
+                  filteredIncidents.map((inc) => {
+                    const isSelected = selectedIncident?.incidentCode === inc.incidentCode;
+                    const esi = inc.triage?.esiLevel || 3;
+                    const esiBorder = esi === 1 ? 'border-red-500/60' : esi === 2 ? 'border-orange-500/50' : 'border-yellow-500/50';
+                    const esiBg = esi === 1 ? 'bg-red-950/20' : esi === 2 ? 'bg-orange-950/20' : 'bg-yellow-950/10';
+
+                    return (
+                      <div
+                        key={inc.incidentCode}
+                        onClick={() => {
+                          setSelectedIncident(inc);
+                          if (cadPanelTab === 'queue') setCadPanelTab('detail');
+                        }}
+                        className={`p-4 rounded-2xl border transition-all cursor-pointer shadow-md space-y-2.5 ${
+                          isSelected
+                            ? 'border-cyan-500 bg-slate-800/90 ring-2 ring-cyan-500/40 shadow-cyan-500/10'
+                            : `${esiBorder} ${esiBg} hover:bg-slate-800/60 hover:border-slate-600`
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <span className={`text-[10px] px-2 py-0.5 rounded-md font-black text-white ${
+                              esi === 1 ? 'bg-red-600' : esi === 2 ? 'bg-orange-600' : 'bg-yellow-600'
+                            }`}>
+                              ESI {esi}
+                            </span>
+                            <span className="font-mono text-xs font-black text-white">{inc.incidentCode}</span>
+                            <span className="text-[11px] text-slate-400 font-medium">({inc.triage?.categoryName || 'General Emergency'})</span>
+                          </div>
+                          <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border ${
+                            inc.status === 'Arrived_Hospital'
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                              : inc.status === 'En_Route_Hospital'
+                              ? 'bg-rose-500/20 text-rose-300 border-rose-500/30 animate-pulse'
+                              : 'bg-slate-800 text-slate-300 border-slate-700'
+                          }`}>
+                            {inc.status.replace(/_/g, ' ')}
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-slate-200 font-semibold leading-snug">{inc.chiefComplaint}</p>
+                        
+                        <div className="flex items-center space-x-1.5 text-[11px] text-slate-400">
+                          <MapPin className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                          <span className="truncate">{inc.location?.address || 'Scene coordinates mapped'}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 text-xs">
+                          <div className="flex items-center space-x-3">
+                            <div className="flex items-center space-x-1">
+                              <Ambulance className="w-3.5 h-3.5 text-cyan-400" />
+                              <span className="font-bold text-cyan-400 text-[11px]">
+                                {inc.assignedAmbulance?.callSign || 'Pending'}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <Hospital className="w-3.5 h-3.5 text-blue-400" />
+                              <span className="font-bold text-blue-400 text-[11px] truncate max-w-[140px]">
+                                {inc.targetHospital?.name || 'Pending'}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedIncident(inc);
+                              setCadPanelTab('detail');
+                            }}
+                            className="text-[11px] font-bold text-cyan-400 hover:text-cyan-300 flex items-center space-x-1 group"
+                          >
+                            <span>Open Console</span>
+                            <ChevronRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Selected Incident Action Console (Visible if tab is 'detail' or 'split') */}
+          {(cadPanelTab === 'detail' || cadPanelTab === 'split') && (
+            selectedIncident ? (
+              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4">
+                
+                {/* Header: Incident Identity & Golden Hour Clock */}
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400">
+                      <Radio className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm font-black text-white">{selectedIncident.incidentCode}</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded font-black text-white ${
+                          (selectedIncident.triage?.esiLevel || 3) <= 2 ? 'bg-red-600' : 'bg-yellow-600'
+                        }`}>
+                          ESI {selectedIncident.triage?.esiLevel || 2} &bull; {selectedIncident.triage?.categoryName}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Status: <span className="text-slate-200 font-semibold">{selectedIncident.status.replace(/_/g, ' ')}</span></p>
+                    </div>
+                  </div>
+                  <div className="text-right bg-slate-950/70 border border-slate-800 px-3 py-1.5 rounded-xl">
+                    <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block">Golden Hour</span>
+                    <span className="text-xs font-black text-amber-400 font-mono">⏱️ 41m Left</span>
+                  </div>
+                </div>
+
+                {/* Patient Complaint & Location */}
+                <div className="text-xs text-slate-200 bg-slate-950/70 p-3.5 rounded-xl border border-slate-800/80 space-y-2">
+                  <div>
+                    <span className="text-slate-400 font-bold uppercase text-[10px] tracking-wider block mb-0.5">Chief Complaint</span>
+                    <p className="font-semibold text-slate-100">{selectedIncident.chiefComplaint}</p>
+                  </div>
+                  <div className="flex items-start space-x-2 pt-1 border-t border-slate-800/60">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400 mt-0.5 flex-shrink-0" />
+                    <span className="text-slate-300 text-[11px]">{selectedIncident.location?.address || 'GPS Coordinates Recorded'}</span>
+                  </div>
+                  {selectedIncident.vitals && (
+                    <div className="pt-2 border-t border-slate-800/60 grid grid-cols-4 gap-2 text-center text-[11px]">
+                      <div className="bg-slate-900/90 p-1.5 rounded-lg border border-slate-800">
+                        <span className="text-[9px] text-slate-400 block font-semibold">HR</span>
+                        <span className="font-black text-red-400">{selectedIncident.vitals.heartRate || '--'} bpm</span>
+                      </div>
+                      <div className="bg-slate-900/90 p-1.5 rounded-lg border border-slate-800">
+                        <span className="text-[9px] text-slate-400 block font-semibold">SpO2</span>
+                        <span className="font-black text-cyan-400">{selectedIncident.vitals.spo2 || '--'}%</span>
+                      </div>
+                      <div className="bg-slate-900/90 p-1.5 rounded-lg border border-slate-800">
+                        <span className="text-[9px] text-slate-400 block font-semibold">BP</span>
+                        <span className="font-black text-amber-400">{selectedIncident.vitals.systolicBp || '--'} mmHg</span>
+                      </div>
+                      <div className="bg-slate-900/90 p-1.5 rounded-lg border border-slate-800">
+                        <span className="text-[9px] text-slate-400 block font-semibold">GCS</span>
+                        <span className="font-black text-emerald-400">{selectedIncident.vitals.gcs || '--'} / 15</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Assigned Ambulance & Hospital Telemetry Hero Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/80 space-y-1.5 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Assigned Unit</span>
+                      <Ambulance className="w-3.5 h-3.5 text-cyan-400" />
+                    </div>
+                    <div className="font-black text-cyan-400 text-sm">
+                      {selectedIncident.assignedAmbulance?.callSign || 'Pending Assignment'}
+                    </div>
+                    <div className="text-[11px] text-slate-300">
+                      Score: <span className="font-bold text-emerald-400">{selectedIncident.assignedAmbulance?.allocationScore || '92.4'}</span> / 100
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/80 space-y-1.5 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Target Hospital</span>
+                      <Hospital className="w-3.5 h-3.5 text-blue-400" />
+                    </div>
+                    <div className="font-black text-blue-400 text-sm truncate">
+                      {selectedIncident.targetHospital?.name || 'Pending Assignment'}
+                    </div>
+                    <div className="text-[11px] text-emerald-400 font-semibold flex items-center space-x-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                      <span>Bed Reserved & Cath Lab Ready</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Auto-Dispatch CTA if unassigned */}
+                {(!selectedIncident.assignedAmbulance?.callSign || selectedIncident.assignedAmbulance?.callSign === 'Pending') && (
+                  <button
+                    onClick={() => handleAutoDispatch(selectedIncident.id || selectedIncident._id || selectedIncident.incidentCode)}
+                    className="w-full py-3 px-4 rounded-xl text-xs font-black bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white shadow-lg shadow-red-600/30 flex items-center justify-center space-x-2 animate-pulse"
+                  >
+                    <Zap className="w-4 h-4" />
+                    <span>⚡ Auto-Dispatch Optimal Unit Now (AI Engine)</span>
+                  </button>
+                )}
+
+                {/* Mission Controls: 2x2 Clean Spacious Action Grid */}
+                <div className="grid grid-cols-2 gap-2.5 pt-1">
+                  
+                  {/* Action 1: Fast Admit */}
+                  <button
+                    onClick={handleFastAdmit}
+                    disabled={selectedIncident.status === 'Arrived_Hospital' || selectedIncident.status === 'Resolved'}
+                    className="p-3 rounded-xl text-left bg-gradient-to-br from-emerald-600/90 to-teal-700/90 hover:from-emerald-500 hover:to-teal-600 text-white transition shadow-lg shadow-emerald-600/20 disabled:opacity-40 disabled:cursor-not-allowed border border-emerald-400/30 flex flex-col justify-between"
+                    title="Fast-Admit Patient Immediately to Hospital Trauma Bay"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <CheckCircle className="w-4 h-4 text-emerald-200" />
+                      <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-white/20 text-white uppercase">One-Click</span>
+                    </div>
+                    <div>
+                      <div className="text-xs font-black">
+                        {selectedIncident.status === 'Arrived_Hospital' ? '✅ Patient Admitted' : '⚡ Fast Admit Patient'}
+                      </div>
+                      <div className="text-[10px] text-emerald-100 font-medium">Safe ER Trauma Handoff</div>
+                    </div>
+                  </button>
+
+                  {/* Action 2: Green Corridor */}
+                  <button
+                    onClick={() => handleToggleGreenCorridor(selectedIncident.id || selectedIncident._id || selectedIncident.incidentCode)}
+                    className={`p-3 rounded-xl text-left transition shadow-lg border flex flex-col justify-between ${
+                      selectedIncident.greenCorridorActive
+                        ? 'bg-cyan-600 hover:bg-cyan-500 text-white border-cyan-400 shadow-cyan-600/30'
+                        : 'bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 border-slate-700 shadow-slate-900/50'
+                    }`}
+                    title="Toggle Traffic Signal Preemption Wave"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <Zap className={`w-4 h-4 ${selectedIncident.greenCorridorActive ? 'text-white fill-white' : 'text-cyan-400'}`} />
+                      <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-900/60 text-slate-300 uppercase">Signals</span>
+                    </div>
+                    <div>
+                      <div className="text-xs font-black">
+                        {selectedIncident.greenCorridorActive ? '🚦 Corridor Active' : '🚦 Green Corridor'}
+                      </div>
+                      <div className="text-[10px] text-slate-300 font-medium">Traffic Light Preemption</div>
+                    </div>
+                  </button>
+
+                  {/* Action 3: Traffic Spike / Detour */}
+                  <button
+                    onClick={() => handleTriggerReroute(selectedIncident.assignedAmbulance?.ambulanceId)}
+                    className="p-3 rounded-xl text-left bg-slate-800/90 hover:bg-amber-600/90 text-slate-200 hover:text-white transition shadow-lg border border-slate-700 hover:border-amber-500/40 flex flex-col justify-between group"
+                    title="Simulate Corridor Traffic Jam & Dynamic Detour"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <Navigation className="w-4 h-4 text-amber-400 group-hover:text-white" />
+                      <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-900/60 text-slate-300 uppercase">Reroute</span>
+                    </div>
+                    <div>
+                      <div className="text-xs font-black">Dynamic Detour</div>
+                      <div className="text-[10px] text-slate-400 group-hover:text-white/80 font-medium">Simulate Traffic Jam</div>
+                    </div>
+                  </button>
+
+                  {/* Action 4: Explainable AI Audit */}
+                  <button
+                    onClick={() => setShowXAIDialog(!showXAIDialog)}
+                    className={`p-3 rounded-xl text-left transition shadow-lg border flex flex-col justify-between ${
+                      showXAIDialog
+                        ? 'bg-indigo-600 text-white border-indigo-400 shadow-indigo-600/30'
+                        : 'bg-slate-800/90 hover:bg-indigo-950/60 text-slate-200 hover:text-indigo-200 border-slate-700 hover:border-indigo-500/40'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center space-x-2">
-                        <span className={`text-[10px] px-1.5 py-0.2 rounded font-black text-white ${
-                          esi === 1 ? 'bg-red-600' : esi === 2 ? 'bg-orange-600' : 'bg-yellow-600'
-                        }`}>
-                          ESI {esi}
-                        </span>
-                        <span className="font-mono text-xs font-bold text-slate-200">{inc.incidentCode}</span>
-                      </div>
-                      <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold border border-slate-700">
-                        {inc.status}
-                      </span>
+                      <Sparkles className="w-4 h-4 text-indigo-400" />
+                      <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-900/60 text-slate-300 uppercase">Audit</span>
                     </div>
-
-                    <p className="text-xs text-slate-300 font-medium line-clamp-1">{inc.chiefComplaint}</p>
-                    
-                    <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2">
-                      <span className="text-cyan-400 font-semibold">{inc.assignedAmbulance?.callSign || 'Unassigned'}</span>
-                      <span className="text-blue-400 font-semibold">{inc.targetHospital?.name?.split(' ')[0] || 'Unassigned'}</span>
+                    <div>
+                      <div className="text-xs font-black">{showXAIDialog ? 'Hide XAI Audit' : 'XAI Rationale'}</div>
+                      <div className="text-[10px] text-slate-400 font-medium">Explainable AI Breakdown</div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+                  </button>
 
-          {/* Selected Incident Action Console */}
-          {selectedIncident ? (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                <div>
-                  <span className="text-xs text-slate-400">Incident Details:</span>
-                  <div className="text-sm font-black text-white">{selectedIncident.incidentCode}</div>
                 </div>
-                <div className="text-right">
-                  <span className="text-[10px] uppercase tracking-wider text-slate-400">Triage Category</span>
-                  <div className="text-xs font-bold text-red-400">{selectedIncident.triage?.categoryName}</div>
-                </div>
+
               </div>
-
-              {/* Triage & Patient Info */}
-              <div className="text-xs text-slate-300 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800 space-y-1">
-                <div><span className="text-slate-400 font-medium">Chief Complaint:</span> {selectedIncident.chiefComplaint}</div>
-                <div><span className="text-slate-400 font-medium">Scene Location:</span> {selectedIncident.location?.address}</div>
-                <div>
-                  <span className="text-slate-400 font-medium">Required Equipment: </span>
-                  <span className="text-cyan-300">{(selectedIncident.triage?.requiredEquipment || []).join(', ')}</span>
-                </div>
-              </div>
-
-              {/* Assigned Vehicle & Hospital */}
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="bg-slate-800/80 p-2.5 rounded-lg border border-slate-700">
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">Assigned Ambulance</div>
-                  <div className="font-bold text-cyan-400 text-sm mt-0.5">
-                    {selectedIncident.assignedAmbulance?.callSign || 'Pending'}
-                  </div>
-                  <div className="text-[10px] text-slate-300 mt-1">
-                    Score: {selectedIncident.assignedAmbulance?.allocationScore || '92.4'} / 100
-                  </div>
-                </div>
-
-                <div className="bg-slate-800/80 p-2.5 rounded-lg border border-slate-700">
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">Target Hospital</div>
-                  <div className="font-bold text-blue-400 text-sm mt-0.5 truncate">
-                    {selectedIncident.targetHospital?.name || 'Pending'}
-                  </div>
-                  <div className="text-[10px] text-emerald-400 mt-1">
-                    Bed Reserved & Pre-alerted
-                  </div>
-                </div>
-              </div>
-
-              {/* Auto-Dispatch button if not assigned */}
-              {(!selectedIncident.assignedAmbulance?.callSign || selectedIncident.assignedAmbulance?.callSign === 'Pending') && (
+            ) : (
+              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-8 text-center text-slate-400 text-xs flex flex-col items-center justify-center space-y-3 min-h-[360px]">
+                <Radio className="w-8 h-8 text-slate-600 animate-pulse" />
+                <p className="font-semibold text-slate-300">No emergency incident selected.</p>
+                <p className="text-[11px] text-slate-500 max-w-xs">
+                  Select an incident from the Live Queue tab to view telemetry, inspect routes, and dispatch vehicles.
+                </p>
                 <button
-                  onClick={() => handleAutoDispatch(selectedIncident.id || selectedIncident._id || selectedIncident.incidentCode)}
-                  className="w-full py-2.5 px-3 rounded-xl text-xs font-black bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white shadow-lg shadow-red-600/30 flex items-center justify-center space-x-2 animate-pulse"
+                  type="button"
+                  onClick={() => setCadPanelTab('queue')}
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition shadow-md"
                 >
-                  <Zap className="w-4 h-4" />
-                  <span>⚡ Auto-Dispatch Optimal Unit Now (AI)</span>
-                </button>
-              )}
-
-              {/* Mission Controls: Green Corridor, Fast Admit, Dynamic Reroute, XAI Audit */}
-              <div className="grid grid-cols-3 gap-2 pt-1">
-                <button
-                  onClick={() => handleToggleGreenCorridor(selectedIncident.id || selectedIncident._id || selectedIncident.incidentCode)}
-                  className={`flex items-center justify-center space-x-1 py-2 px-1.5 rounded-lg text-xs font-bold transition shadow ${
-                    selectedIncident.greenCorridorActive
-                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
-                  }`}
-                  title="Toggle Traffic Signal Preemption"
-                >
-                  <Zap className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span className="truncate">{selectedIncident.greenCorridorActive ? 'Corridor On' : 'Green Corridor'}</span>
-                </button>
-
-                <button
-                  onClick={handleFastAdmit}
-                  disabled={selectedIncident.status === 'Arrived_Hospital' || selectedIncident.status === 'Resolved'}
-                  className="flex items-center justify-center space-x-1 py-2 px-1.5 rounded-lg text-xs font-black bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white transition shadow shadow-emerald-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Fast-Admit Patient Immediately to Hospital Trauma Bay"
-                >
-                  <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span className="truncate">{selectedIncident.status === 'Arrived_Hospital' ? '✅ Admitted' : '⚡ Fast Admit'}</span>
-                </button>
-
-                <button
-                  onClick={() => handleTriggerReroute(selectedIncident.assignedAmbulance?.ambulanceId)}
-                  className="flex items-center justify-center space-x-1 py-2 px-1.5 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white transition shadow"
-                  title="Simulate Corridor Traffic Jam & Dynamic Reroute"
-                >
-                  <Navigation className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span className="truncate">Traffic Spike</span>
+                  View Active Queue ({incidents.length})
                 </button>
               </div>
-
-              {/* Explainable AI Decision Trigger */}
-              <button
-                onClick={() => setShowXAIDialog(!showXAIDialog)}
-                className="w-full py-2 px-3 rounded-lg text-xs font-bold bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-300 border border-cyan-500/40 transition flex items-center justify-center space-x-2"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                <span>{showXAIDialog ? 'Hide Decision Audit Breakdown' : 'Inspect Explainable AI (XAI) Rationale'}</span>
-              </button>
-
-            </div>
-          ) : (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center text-slate-400 text-xs">
-              Select an incident from the queue to view details and trigger dispatch controls.
-            </div>
+            )
           )}
 
         </div>

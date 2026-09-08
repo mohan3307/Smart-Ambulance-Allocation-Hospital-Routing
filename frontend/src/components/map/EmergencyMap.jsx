@@ -476,79 +476,64 @@ export const EmergencyMap = ({
             <button
               type="button"
               onClick={onToggleFullMap}
-              className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition flex items-center space-x-1 ${
+              className={`px-3 py-1 rounded-lg font-bold text-[11px] transition flex items-center space-x-1.5 ${
                 isFullMap
                   ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30 ring-1 ring-amber-400'
                   : 'bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30'
               }`}
-              title={isFullMap ? "Restore Split View" : "Expand Full Map"}
+              title={isFullMap ? "Restore Split Screen" : "Expand to Full Map View"}
             >
               {isFullMap ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-              <span className="hidden sm:inline">{isFullMap ? 'Exit Full' : 'Full Map'}</span>
+              <span className="hidden sm:inline">{isFullMap ? 'Exit Full' : '⛶ Full Map'}</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Floating Side Button for Quick Full Map Expand */}
-      {onToggleFullMap && (
-        <button
-          type="button"
-          onClick={onToggleFullMap}
-          className="absolute right-3 top-20 z-[400] bg-slate-900/95 hover:bg-slate-800 border border-blue-500/60 p-2.5 rounded-xl shadow-2xl backdrop-blur-md text-white transition-all transform hover:scale-105 flex items-center space-x-1.5 pointer-events-auto"
-          title={isFullMap ? "Collapse to Split Screen" : "Expand Full Map"}
-        >
-          {isFullMap ? <Minimize2 className="w-4 h-4 text-amber-400" /> : <Maximize2 className="w-4 h-4 text-blue-400" />}
-          <span className="text-[10px] font-black uppercase text-slate-200 hidden md:inline">
-            {isFullMap ? 'Split View' : 'Full Map'}
-          </span>
-        </button>
-      )}
-
-      {/* Floating Mission Navigation HUD (Distance & ETA) - Placed below top bar */}
+      {/* Floating Mission Navigation HUD (Relocated to bottom-left with high-tech glassmorphic CAD styling) */}
       {primaryRoute && (
-        <div className="absolute top-16 left-3 z-[400] bg-slate-900/95 border border-blue-500/50 rounded-2xl p-3 shadow-2xl backdrop-blur-md max-w-[280px] text-xs space-y-2 pointer-events-auto">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+        <div className="absolute bottom-4 left-4 z-[400] bg-slate-900/95 border border-blue-500/50 rounded-2xl p-3.5 shadow-2xl backdrop-blur-xl max-w-[300px] w-full text-xs space-y-2.5 pointer-events-auto transition-all animate-fade-in">
+          <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
             <div className="flex items-center space-x-2">
               <div className={`w-2.5 h-2.5 rounded-full ${primaryRoute.status === 'Arrived_Hospital' ? 'bg-emerald-400' : 'bg-blue-400'} animate-ping`} />
-              <span className="font-black text-white uppercase tracking-wider text-[10px]">
-                {primaryRoute.status === 'Arrived_Hospital' ? '✅ Hospital Reached' : 'Active Navigation Mission'}
+              <span className="font-black text-white uppercase tracking-wider text-[11px]">
+                {primaryRoute.status === 'Arrived_Hospital' ? '✅ Mission Completed' : 'Active Navigation Mission'}
               </span>
             </div>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+            <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/30">
               {primaryRoute.callSign}
             </span>
           </div>
 
-          {/* Metric Highlights */}
-          <div className="grid grid-cols-3 gap-1.5 text-center">
-            <div className="bg-slate-800/90 rounded-xl p-1.5 border border-slate-700">
-              <div className="text-[9px] text-slate-400 font-bold uppercase">Distance</div>
-              <div className="text-sm font-black text-blue-400">
+          {/* Metric Highlights with crisp modern cards */}
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="bg-slate-800/90 rounded-xl p-2 border border-slate-700/80 shadow-inner">
+              <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Distance</div>
+              <div className="text-sm font-black text-blue-400 mt-0.5">
                 {primaryRoute.remainingKm} <span className="text-[9px] font-normal text-slate-400">km</span>
               </div>
             </div>
-            <div className="bg-slate-800/90 rounded-xl p-1.5 border border-slate-700">
-              <div className="text-[9px] text-slate-400 font-bold uppercase">ETA</div>
-              <div className="text-sm font-black text-emerald-400">
+            <div className="bg-slate-800/90 rounded-xl p-2 border border-slate-700/80 shadow-inner">
+              <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">ETA</div>
+              <div className="text-sm font-black text-emerald-400 mt-0.5">
                 {primaryRoute.etaMin} <span className="text-[9px] font-normal text-slate-400">min</span>
               </div>
             </div>
-            <div className="bg-slate-800/90 rounded-xl p-1.5 border border-slate-700">
-              <div className="text-[9px] text-slate-400 font-bold uppercase">Speed</div>
-              <div className="text-sm font-black text-amber-400">
+            <div className="bg-slate-800/90 rounded-xl p-2 border border-slate-700/80 shadow-inner">
+              <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Speed</div>
+              <div className="text-sm font-black text-amber-400 mt-0.5">
                 {primaryRoute.speed} <span className="text-[9px] font-normal text-slate-400">km/h</span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-between text-[10px] pt-0.5">
-            <span className="text-slate-400 font-medium">Mission Status:</span>
-            <span className={`font-bold px-2 py-0.5 rounded text-[10px] ${
+          <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-800/70">
+            <span className="text-slate-400 font-medium">Status:</span>
+            <span className={`font-bold px-2 py-0.5 rounded-md text-[10px] uppercase tracking-wide ${
               primaryRoute.status === 'Arrived_Hospital'
                 ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/50'
                 : primaryRoute.status === 'En_Route_Hospital'
-                ? 'bg-red-950 text-red-300 border border-red-500/50'
+                ? 'bg-rose-950 text-rose-300 border border-rose-500/50'
                 : 'bg-blue-950 text-blue-300 border border-blue-500/40'
             }`}>
               {primaryRoute.status === 'Arrived_Hospital'
