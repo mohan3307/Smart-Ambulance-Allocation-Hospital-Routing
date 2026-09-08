@@ -320,17 +320,26 @@ export const EmergencyMap = ({
           remainingKm += dist;
         }
       }
-      const speed = a.location?.speedKmH || a.speedKmH || 48;
-      const etaMin = Math.max(1, Math.round((remainingKm / speed) * 60));
+      const isArrived = a.status === 'Arrived_Hospital';
+      const liveRemaining = isArrived
+        ? 0.0
+        : a.remainingKm !== undefined
+        ? Math.round(a.remainingKm * 10) / 10
+        : Math.max(0.1, Math.round(remainingKm * 10) / 10);
+      const liveEta = isArrived
+        ? 0
+        : a.etaMinutes !== undefined
+        ? a.etaMinutes
+        : Math.max(1, Math.round((remainingKm / speed) * 60));
 
       return {
         ambulanceId: a.id || a._id,
         callSign: a.callSign,
         coordinates: a.activeRoute.map((pt) => [pt.latitude, pt.longitude]),
         color: a.trafficDelayFactor > 1.05 ? '#4338CA' : '#1D4ED8', // Dark Royal Blue
-        remainingKm: Math.max(0.2, Math.round(remainingKm * 10) / 10),
+        remainingKm: liveRemaining,
         totalKm: Math.max(0.5, Math.round(totalKm * 10) / 10),
-        etaMin,
+        etaMin: liveEta,
         speed,
         status: a.status || 'En_Route',
       };

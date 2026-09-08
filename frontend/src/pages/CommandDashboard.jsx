@@ -16,7 +16,8 @@ import {
   Sparkles,
   Info,
   Maximize2,
-  Minimize2
+  Minimize2,
+  RotateCcw
 } from 'lucide-react';
 import { EmergencyMap } from '../components/map/EmergencyMap';
 import { XAIDecisionCard } from '../components/xai/XAIDecisionCard';
@@ -203,10 +204,41 @@ export const CommandDashboard = ({ onOpenSOS }) => {
       setAmbulances((prev) =>
         prev.map((a) =>
           (a.id || a._id).toString() === data.ambulanceId.toString()
-            ? { ...a, location: { ...a.location, latitude: data.latitude, longitude: data.longitude }, status: data.status }
+            ? {
+                ...a,
+                location: {
+                  ...a.location,
+                  latitude: data.latitude,
+                  longitude: data.longitude,
+                },
+                status: data.status,
+                routeProgressIndex: data.routeProgressIndex,
+                remainingKm: data.remainingKm,
+                etaMinutes: data.etaMinutes,
+              }
             : a
         )
       );
+
+      // Keep active incident status in sync live
+      setSelectedIncident((curr) => {
+        if (
+          curr &&
+          ((curr.id && curr.id === data.currentIncidentId) ||
+            (curr._id && curr._id === data.currentIncidentId) ||
+            curr.assignedAmbulance?.ambulanceId === data.ambulanceId)
+        ) {
+          return {
+            ...curr,
+            status: data.status,
+            assignedAmbulance: {
+              ...curr.assignedAmbulance,
+              estimatedArrivalMinutes: data.etaMinutes,
+            },
+          };
+        }
+        return curr;
+      });
     });
 
     socket.on('incident:status_changed', (updatedInc) => {
@@ -216,16 +248,31 @@ export const CommandDashboard = ({ onOpenSOS }) => {
       setIncidents((prev) =>
         prev.map((i) =>
           (i.id || i._id || i.incidentCode) === (updatedInc.id || updatedInc._id || updatedInc.incidentCode)
-            ? updatedInc
+            ? { ...i, ...updatedInc }
             : i
         )
       );
+      setSelectedIncident((curr) => {
+        if (
+          curr &&
+          ((curr.id && curr.id === (updatedInc.id || updatedInc._id || updatedInc.incidentCode)) ||
+            curr.incidentCode === updatedInc.incidentCode)
+        ) {
+          return { ...curr, ...updatedInc };
+        }
+        return curr;
+      });
+    });
+
+    socket.on('system:reset', () => {
+      loadData();
     });
 
     return () => {
       socket.off('incident:created');
       socket.off('ambulance:position_updated');
       socket.off('incident:status_changed');
+      socket.off('system:reset');
     };
   }, [socket]);
 
@@ -337,6 +384,16 @@ export const CommandDashboard = ({ onOpenSOS }) => {
       }
     } catch (err) {
       showToast(err.response?.data?.error || err.message, 'error', 'Reroute Simulation Error');
+    }
+  };
+
+  const handleResetDemoData = async () => {
+    try {
+      await EmergencyAPI.resetSystemData();
+      showToast('All active missions & ambulances reset to clean sector seed data', 'success', 'Demo Reset Completed');
+      await loadData();
+    } catch (err) {
+      showToast(err.message, 'error', 'Reset Error');
     }
   };
 
@@ -596,6 +653,13 @@ export const CommandDashboard = ({ onOpenSOS }) => {
                 title="Refresh Map"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={handleResetDemoData}
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 border border-slate-700"
+                title="Reset All Live Data to Clean Initial State (Clears stale dispatches)"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
