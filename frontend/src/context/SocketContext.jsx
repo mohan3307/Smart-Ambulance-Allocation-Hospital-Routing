@@ -10,7 +10,8 @@ export const SocketProvider = ({ children }) => {
 
   useEffect(() => {
     // Connect to WebSocket server
-    const s = io(window.location.origin, {
+    const backendUrl = import.meta.env.VITE_API_URL || window.location.origin;
+    const s = io(backendUrl, {
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 10,
     });
