@@ -12,8 +12,11 @@ export const SocketProvider = ({ children }) => {
     // Connect to WebSocket server
     const backendUrl = import.meta.env.VITE_API_URL || window.location.origin;
     const s = io(backendUrl, {
-      transports: ['websocket', 'polling'],
-      reconnectionAttempts: 10,
+      transports: ['polling', 'websocket'],
+      reconnection: true,
+      reconnectionAttempts: 30,
+      reconnectionDelay: 1000,
+      timeout: 20000,
     });
 
     s.on('connect', () => {

@@ -337,6 +337,7 @@ export const EmergencyMap = ({
           remainingKm += dist;
         }
       }
+      const speed = a.location?.speedKmH || a.speedKmH || 48;
       const isArrived = a.status === 'Arrived_Hospital';
       const liveRemaining = isArrived
         ? 0.0
