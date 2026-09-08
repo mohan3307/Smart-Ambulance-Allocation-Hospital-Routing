@@ -2,6 +2,7 @@ import { DataStore } from '../services/dataStore.js';
 import { AIClientService } from '../services/aiClient.js';
 import { RoutingSimulator } from '../services/routingSimulator.js';
 import { broadcastEvent } from '../services/socketManager.js';
+import { SMSService } from '../services/smsService.js';
 
 export const getIncidents = async (req, res) => {
   try {
@@ -198,6 +199,25 @@ export const createEmergencyIncident = async (req, res) => {
 
     // Real-time broadcast
     broadcastEvent('incident:created', savedIncident);
+
+    // Send SMS alerts to Hospital and Caller
+    SMSService.notifyHospitalDispatch({
+      hospitalName: selectedHosp.name,
+      hospitalPhone: selectedHosp.contactPhone,
+      incidentCode: savedIncident.incidentCode,
+      esiLevel: triage.esi_level,
+      chiefComplaint,
+      ambCallSign: selectedAmb.call_sign,
+      etaMinutes: selectedAmb.eta_minutes,
+    }).catch(console.warn);
+
+    SMSService.notifyCallerDispatch({
+      callerPhone,
+      incidentCode: savedIncident.incidentCode,
+      ambCallSign: selectedAmb.call_sign,
+      etaMinutes: selectedAmb.eta_minutes,
+    }).catch(console.warn);
+
     broadcastEvent('ambulance:dispatched', {
       incidentId: savedIncident.incidentCode,
       ambulanceId: selectedAmb.id,
@@ -382,6 +402,24 @@ export const autoDispatchIncident = async (req, res) => {
       etaMinutes: selectedAmb.eta_minutes,
       route: fullActiveRoute,
     });
+
+    // Outbound alerts to hospital and caller
+    SMSService.notifyHospitalDispatch({
+      hospitalName: selectedHosp.name,
+      hospitalPhone: selectedHosp.contactPhone,
+      incidentCode: incident.incidentCode,
+      esiLevel: incident.triage?.esiLevel || 2,
+      chiefComplaint: incident.chiefComplaint,
+      ambCallSign: selectedAmb.call_sign,
+      etaMinutes: selectedAmb.eta_minutes,
+    }).catch(console.warn);
+
+    SMSService.notifyCallerDispatch({
+      callerPhone: incident.callerPhone,
+      incidentCode: incident.incidentCode,
+      ambCallSign: selectedAmb.call_sign,
+      etaMinutes: selectedAmb.eta_minutes,
+    }).catch(console.warn);
 
     res.json({ success: true, data: updated, ambulance: selectedAmb, hospital: selectedHosp });
   } catch (err) {

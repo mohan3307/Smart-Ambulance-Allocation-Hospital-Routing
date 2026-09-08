@@ -353,6 +353,53 @@ export const CommandDashboard = ({ onOpenSOS }) => {
     }
   };
 
+  const handleSimulateMultiCallConflict = async () => {
+    try {
+      SoundFX.playDispatchChime();
+      showToast('Simulating 2 simultaneous high-priority calls in neighboring sectors...', 'warning', 'Multi-Call Conflict Injected');
+      
+      // Call 1: STEMI
+      const call1 = await EmergencyAPI.createEmergency({
+        callerName: 'Bystander 1 (T.Nagar)',
+        callerPhone: '+91-98840-11111',
+        source: 'Simulated_Conflict_1',
+        location: { latitude: 13.0418, longitude: 80.2341, address: 'Usman Road, T.Nagar, Chennai' },
+        chiefComplaint: 'Acute STEMI heart attack, severe chest pain radiating to left arm, cold sweat',
+        symptoms: ['crushing chest pain', 'shortness of breath', 'cold sweat'],
+        conscious: true,
+        breathing: true,
+        severeBleeding: false,
+        casualtyCount: 1,
+        vitals: { heartRate: 130, spo2: 91, systolicBp: 86, gcs: 14 },
+      });
+
+      // Call 2: Trauma Crash
+      const call2 = await EmergencyAPI.createEmergency({
+        callerName: 'Traffic Police Patrol',
+        callerPhone: '+91-98840-22222',
+        source: 'Simulated_Conflict_2',
+        location: { latitude: 12.9750, longitude: 80.2500, address: 'OMR IT Corridor, Chennai' },
+        chiefComplaint: 'Motorcycle rollover crash, arterial leg laceration, heavy bleeding',
+        symptoms: ['massive bleeding', 'open fracture', 'hypotension'],
+        conscious: true,
+        breathing: true,
+        severeBleeding: true,
+        casualtyCount: 1,
+        vitals: { heartRate: 140, spo2: 93, systolicBp: 90, gcs: 13 },
+      });
+
+      setSelectedIncident(call1.data);
+      await loadData();
+      showToast(
+        `Multi-Ambulance Conflict Resolved: ${call1.data.assignedAmbulance?.callSign || 'ALS Unit'} -> STEMI, ${call2.data.assignedAmbulance?.callSign || 'Trauma Unit'} -> OMR Crash!`,
+        'success',
+        'Multi-Call Allocation Optimal'
+      );
+    } catch (err) {
+      showToast(err.message, 'error', 'Conflict Simulation Error');
+    }
+  };
+
   const availableAmbulances = ambulances.filter((a) => a.status === 'Available');
   const enRouteAmbulances = ambulances.filter((a) => a.status !== 'Available');
 
@@ -492,6 +539,14 @@ export const CommandDashboard = ({ onOpenSOS }) => {
               <span className="font-bold text-xs text-slate-200">METROPOLITAN LIVE CAD GIS MAP</span>
             </div>
             <div className="flex items-center space-x-2 text-xs">
+              <button
+                onClick={handleSimulateMultiCallConflict}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold transition shadow-lg shadow-purple-600/30"
+                title="Simulate 2 Simultaneous Emergencies & Multi-Ambulance Reallocation"
+              >
+                <Zap className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Multi-Call Conflict Demo</span>
+              </button>
               <button
                 onClick={() => setShowNewEmergencyModal(true)}
                 className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold transition shadow-lg shadow-red-600/30"

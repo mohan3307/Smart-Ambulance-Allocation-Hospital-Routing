@@ -34,6 +34,7 @@ export const BystanderSOS = () => {
   const { socket } = useSocket();
   const [step, setStep] = useState('sos_form'); // 'sos_form' | 'tracking_active'
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
   const [createdIncident, setCreatedIncident] = useState(null);
 
   // Bystander form
@@ -215,6 +216,28 @@ export const BystanderSOS = () => {
             </p>
           </div>
 
+          {/* Online Web SOS vs Offline Low-Network SMS Switcher */}
+          <div className="flex rounded-xl bg-slate-900 border border-slate-800 p-1">
+            <button
+              type="button"
+              onClick={() => setIsOfflineMode(false)}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
+                !isOfflineMode ? 'bg-red-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <span>🌐 Live Web CAD SOS</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsOfflineMode(true)}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
+                isOfflineMode ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <span>📶 Offline SMS Mode (No Internet)</span>
+            </button>
+          </div>
+
           {/* Quick City Selector */}
           <div className="space-y-1.5">
             <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
@@ -365,16 +388,37 @@ export const BystanderSOS = () => {
             />
           </div>
 
-          {/* BIG SOS TRIGGER BUTTON */}
-          <div className="pt-2">
-            <button
-              onClick={handleTriggerSOS}
-              disabled={isSubmitting}
-              className="w-full py-5 rounded-2xl font-black text-lg text-white uppercase tracking-wider bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:from-red-500 hover:to-rose-500 shadow-2xl shadow-red-600/50 border-2 border-red-400 flex items-center justify-center space-x-3 transition-transform active:scale-95"
-            >
-              <ShieldAlert className="w-7 h-7 animate-bounce" />
-              <span>{isSubmitting ? 'DISPATCHING EMERGENCY SERVICES...' : '🚨 TRIGGER EMERGENCY SOS NOW'}</span>
-            </button>
+          {/* BIG SOS TRIGGER BUTTON / OFFLINE SMS TRIGGER */}
+          <div className="pt-2 space-y-3">
+            {!isOfflineMode ? (
+              <button
+                onClick={handleTriggerSOS}
+                disabled={isSubmitting}
+                className="w-full py-5 rounded-2xl font-black text-lg text-white uppercase tracking-wider bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:from-red-500 hover:to-rose-500 shadow-2xl shadow-red-600/50 border-2 border-red-400 flex items-center justify-center space-x-3 transition-transform active:scale-95"
+              >
+                <ShieldAlert className="w-7 h-7 animate-bounce" />
+                <span>{isSubmitting ? 'DISPATCHING EMERGENCY SERVICES...' : '🚨 TRIGGER EMERGENCY SOS NOW'}</span>
+              </button>
+            ) : (
+              <div className="bg-amber-950/40 border-2 border-amber-500/60 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center space-x-2 text-amber-400 text-xs font-bold">
+                  <PhoneCall className="w-4 h-4 animate-pulse" />
+                  <span>CELLULAR SMS DISPATCH (0% INTERNET REQUIRED)</span>
+                </div>
+                <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-[11px] font-mono text-slate-300">
+                  SOS [{currentType.label}] GPS:{location.latitude},{location.longitude} LOC:{location.address} CASUALTY:{casualtyCount}
+                </div>
+                <a
+                  href={`sms:108?body=${encodeURIComponent(`SOS [${currentType.label}] GPS:${location.latitude},${location.longitude} LOC:${location.address} CASUALTY:${casualtyCount}`)}`}
+                  className="w-full py-4 rounded-xl font-black text-base text-white uppercase tracking-wider bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 shadow-xl border border-amber-400 flex items-center justify-center space-x-2 text-center"
+                >
+                  <span>📲 Send Emergency SMS to 108 Dispatch</span>
+                </a>
+                <p className="text-[10px] text-slate-400 text-center">
+                  Works on basic 2G / 3G cellular SMS without internet data connectivity.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Backup Hotline Call */}

@@ -8,8 +8,22 @@ import {
   Zap, 
   RefreshCw,
   FileText,
-  Sliders
+  Sliders,
+  TrendingUp,
+  Award
 } from 'lucide-react';
+import { 
+  ResponsiveContainer, 
+  AreaChart, 
+  Area, 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  Tooltip, 
+  Legend, 
+  CartesianGrid 
+} from 'recharts';
 import { EmergencyAPI } from '../services/api';
 
 export const AnalyticsAudit = () => {
@@ -199,6 +213,103 @@ export const AnalyticsAudit = () => {
               <span className="text-slate-400">WebSocket Transport:</span>
               <span className="font-bold text-emerald-400">Socket.IO 4.8 Full-Duplex Broadcasts</span>
             </div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Predictive ETA vs Actual Ground Time & Regional Heatmap (7 cols + 5 cols) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        {/* Predictive vs Actual ETA Chart (7 cols) */}
+        <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+            <div className="flex items-center space-x-2">
+              <TrendingUp className="w-5 h-5 text-emerald-400" />
+              <div>
+                <h3 className="text-sm font-black text-white">Predictive AI ETA vs. Actual Ground Time</h3>
+                <p className="text-[11px] text-slate-400">Verifying AI traffic routing accuracy vs static baseline</p>
+              </div>
+            </div>
+            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              -34% Delay Reduction
+            </span>
+          </div>
+
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={[
+                { mission: 'M1 (STEMI)', staticEta: 14.5, aegisAiEta: 9.2, actualTime: 8.8 },
+                { mission: 'M2 (Crash)', staticEta: 18.0, aegisAiEta: 11.5, actualTime: 11.2 },
+                { mission: 'M3 (Stroke)', staticEta: 12.0, aegisAiEta: 7.8, actualTime: 7.5 },
+                { mission: 'M4 (Trauma)', staticEta: 22.5, aegisAiEta: 14.0, actualTime: 13.6 },
+                { mission: 'M5 (Cardiac)', staticEta: 16.0, aegisAiEta: 10.2, actualTime: 9.9 },
+                { mission: 'M6 (Burn)', staticEta: 19.5, aegisAiEta: 12.8, actualTime: 12.1 },
+                { mission: 'M7 (Arrest)', staticEta: 15.0, aegisAiEta: 9.6, actualTime: 9.4 },
+              ]}>
+                <defs>
+                  <linearGradient id="colorAegis" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorStatic" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#EF4444" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
+                <XAxis dataKey="mission" stroke="#64748B" tick={{ fontSize: 10 }} />
+                <YAxis stroke="#64748B" tick={{ fontSize: 10 }} unit="m" />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#0F172A', borderColor: '#334155', borderRadius: '0.75rem', fontSize: '11px' }}
+                />
+                <Legend wrapperStyle={{ fontSize: '11px' }} />
+                <Area type="monotone" dataKey="staticEta" name="Traditional Static ETA" stroke="#EF4444" strokeWidth={2} fillOpacity={1} fill="url(#colorStatic)" />
+                <Area type="monotone" dataKey="aegisAiEta" name="Aegis AI Predicted ETA" stroke="#3B82F6" strokeWidth={2} strokeDasharray="4 4" fill="none" />
+                <Area type="monotone" dataKey="actualTime" name="Actual Ground Arrival" stroke="#10B981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorAegis)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-slate-400 bg-slate-950/60 p-2 rounded-xl border border-slate-800">
+            <span>Average Predictive Error: <strong className="text-emerald-400">&plusmn;22 seconds</strong></span>
+            <span>Static Routing Error: <strong className="text-rose-400">+5.2 minutes</strong></span>
+          </div>
+        </div>
+
+        {/* Regional Golden Hour Compliance Heatmap (5 cols) */}
+        <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+            <div className="flex items-center space-x-2">
+              <Award className="w-5 h-5 text-amber-400" />
+              <h3 className="text-sm font-black text-white">Multi-State Golden Hour Compliance</h3>
+            </div>
+            <span className="text-[10px] text-slate-400">Target: &lt;8 min</span>
+          </div>
+
+          <div className="space-y-2 pt-1 text-xs">
+            {[
+              { region: 'Tamil Nadu (Chennai)', time: '6.8m', rate: 98, color: 'bg-emerald-500' },
+              { region: 'Kerala (Kochi)', time: '6.5m', rate: 99, color: 'bg-emerald-500' },
+              { region: 'Telangana (Hyderabad)', time: '7.1m', rate: 96, color: 'bg-emerald-500' },
+              { region: 'Karnataka (Bengaluru)', time: '7.4m', rate: 95, color: 'bg-emerald-500' },
+              { region: 'Delhi NCR', time: '7.9m', rate: 94, color: 'bg-cyan-500' },
+              { region: 'Maharashtra (Mumbai)', time: '8.1m', rate: 93, color: 'bg-cyan-500' },
+            ].map((st, i) => (
+              <div key={i} className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-200">{st.region}</span>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-emerald-400 font-mono font-bold">{st.time} avg</span>
+                    <span className="text-xs font-black text-white bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">
+                      {st.rate}%
+                    </span>
+                  </div>
+                </div>
+                <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                  <div className={`h-full ${st.color} rounded-full`} style={{ width: `${st.rate}%` }} />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 

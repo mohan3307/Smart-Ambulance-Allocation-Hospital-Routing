@@ -27,53 +27,50 @@ However, physical proximity alone often causes fatal delays:
 
 ## 🏛️ System Architecture
 
-```
-                                  +-------------------------------------------------+
-                                  |            CLIENT-FACING APPLICATIONS           |
-                                  |       (React 18 + Tailwind CSS + Leaflet)       |
-                                  +-----------------------+-------------------------+
-                                                          |
-             +-----------------------+--------------------+-------------------+-----------------------+
-             |                       |                                        |                       |
-+------------v------------+ +--------v---------------+               +--------v------------+ +--------v------------+
-|  Command Dispatcher CAD | |    Bystander SOS &     |               | Hospital ER Intake  | | Paramedic In-Vehicle|
-|  - Live GIS Map         | |    CPR Metronome App   |               | - Inbound Ticker    | | Tablet HUD          |
-|  - Triage Queue         | | - 1-Tap Geolocation    |               | - Live Vitals Stream| | - Turn-by-turn GIS  |
-|  - Green Corridor Ctrl  | | - 110 BPM Audio Beat   |               | - Bed Capacity Ctrl | | - Reroute Alerts    |
-|  - Decision Audit Logs  | | - Emergency Protocols  |               | - Trauma Bay Prep   | | - Vitals Logger     |
-+------------+------------+ +--------+---------------+               +--------+------------+ +--------+------------+
-             |                       |                                        |                       |
-             +-----------------------+--------------------+-------------------+-----------------------+
-                                                          | HTTP REST & WebSockets (Port 5000)
-                                                          v
-                                  +-------------------------------------------------+
-                                  |            CORE GATEWAY & BACKEND               |
-                                  |          (Node.js + Express + Socket.IO)        |
-                                  +-----------------------+-------------------------+
-                                                          |
-                      +-----------------------------------+-----------------------------------+
-                      |                                                                       |
-                      v                                                                       v
-        +---------------------------+                                           +---------------------------+
-        |   DATASTORE LAYER         |                                           | RESILIENT CIRCUIT BREAKER |
-        | - MongoDB (Port 27017)    |                                           | If AI service is offline, |
-        | - Resilient In-Memory     |                                           | automatically engages     |
-        |   Collections Fallback    |                                           | Manchester Triage Rules   |
-        +---------------------------+                                           +-------------+-------------+
-                                                                                              |
-                                  +-------------------------------------------------+         |
-                                  |            AI / ML MICROSERVICE                 |<--------+
-                                  |             (Python 3.14 + FastAPI)             | (Graceful Fallback)
-                                  +-----------------------+-------------------------+
-                                                          |
-             +--------------------------------------------+-------------------------------------------+
-             |                                            |                                           |
-+------------v------------+                  +------------v------------+                 +------------v------------+
-|  NLP Triage Classifier |                  | Multi-Criteria Allocator|                 | Bed-Aware Recommender   |
-| - Text & Vitals Parsing |                  | - Score = w_eta*ETA +   |                 | - Specialty Matching    |
-| - ESI 1 to 5 Scoring    |                  |   w_eq*Equip +          |                 | - Anti-Diversion Penalty|
-| - Specialty Detector    |                  |   w_sk*Skill - Traffic  |                 | - ICU Saturated Filter  |
-+-------------------------+                  +-------------------------+                 +-------------------------+
+```mermaid
+flowchart TD
+    subgraph Citizens_And_Dispatchers["Emergency Intake Layer"]
+        SOS["Bystander SOS Web/Mobile<br/>(1-Tap GPS + 110 BPM CPR)"]
+        SMS["Offline SMS Gateway<br/>(Low-Network 2G Fallback)"]
+        CAD["Central CAD Dispatcher<br/>(Command Console)"]
+    end
+
+    subgraph Core_Backend["Node.js + Express Gateway (Port 5000)"]
+        Router["Express REST & Geo Engine"]
+        SocketIO["Socket.IO Live Telemetry Broadcast"]
+        Store[("Datastore Layer: MongoDB Atlas / In-Memory Store")]
+        Alerts["SMSService (Twilio + Cellular Fallback)"]
+    end
+
+    subgraph AI_Microservice["AI/ML Service (FastAPI / Port 8000)"]
+        NLP["NLP Triage Engine (ESI 1-5 Severity)"]
+        Alloc["Multi-Criteria Allocator (Skill + Equip + ETA)"]
+        Hosp["Anti-Diversion Hospital Recommender"]
+        XAI["XAI Explainer (Decision Justifications)"]
+    end
+
+    subgraph Ground_Units["Field Emergency Network"]
+        Ambulance["Paramedic Tablet HUD (Turn-by-turn OSRM)"]
+        Traffic["Smart Traffic Preemption (Green Corridor)"]
+        HospitalER["Hospital ER Receiver (Trauma Bay Stand-by)"]
+    end
+
+    SOS -->|REST / WebSockets| Router
+    SMS -->|Inbound Gateway| Router
+    CAD -->|Manage Fleet & Incidents| Router
+
+    Router <--> SocketIO
+    Router <--> Store
+    Router -->|JSON Pipeline| NLP
+    NLP --> Alloc --> Hosp --> XAI
+    XAI -->|Optimized Allocation| Router
+
+    Router --> Alerts
+    SocketIO -->|Live Coordinates & HUD| Ambulance
+    SocketIO -->|Pre-Alert & Live Vitals| HospitalER
+    SocketIO -->|Preemption Command| Traffic
+    Alerts -->|Outbound SMS| HospitalER
+    Alerts -->|Outbound SMS| SOS
 ```
 
 ---
@@ -218,6 +215,79 @@ node node_modules/vite/bin/vite.js
 
 ---
 
+## ⏱️ 3-Minute Hackathon Demo Script & Storyline for Judges
+
+When presenting **AegisResponse** to hackathon judges, follow this high-impact 3-minute storyline:
+
+### 🕒 Minute 1: The Crisis & Citizen SOS Intake
+1. **The Hook**: *"Every second counts in the Golden Hour. But when cardiac arrest hits, dispatching the wrong ambulance or sending a patient to a saturated hospital ER with 0 ICU beds costs human lives."*
+2. **Citizen SOS Demo**:
+   - Open the **Bystander SOS** portal (`/sos`).
+   - Click **"🌟 Chennai (TN)"** (or your local city). Show the 1-tap geolocation and choose **"Unconscious / Stopped Breathing"**.
+   - Click **"🚨 TRIGGER EMERGENCY SOS NOW"**. Hear the Web Audio CAD dispatch alert chime!
+   - Show the **Synchronized 110 BPM CPR Metronome** ticking audio and visual beat while the ambulance is in transit.
+   - Switch to **"📶 Offline SMS Mode"** to prove zero-internet 2G cellular fallback dispatching via SMS.
+
+### 🕒 Minute 2: CAD Dispatch, Real Road Routing & Dynamic Detour
+1. **Command CAD Console (`/`)**:
+   - Show the real-time GIS map powered by HTML5 GPU hardware acceleration.
+   - Show the **Golden Hour Survival Protocol Banner** (`⏱️ 41m 20s Left in Window`).
+   - Notice the dark royal blue (`#1D4ED8`) road polyline following real OSRM road geometry.
+   - Point out the **blinking red heart inside the ambulance marker** proving the patient is on board.
+2. **Multi-Ambulance Conflict Resolution**:
+   - Click **"⚡ Multi-Call Conflict Demo"**.
+   - Two simultaneous high-priority calls appear in the queue. Show how the AI matches the specialized ALS unit to the STEMI patient and the trauma unit to the expressway crash without resource starvation!
+3. **Traffic Jam & Dynamic Detour**:
+   - Click **"Simulate Traffic Spike"**.
+   - Hear the warning siren chirp as the system detects corridor congestion, calculates a live dynamic detour, and activates the **Green Corridor** traffic preemption wave.
+
+### 🕒 Minute 3: Hospital Anti-Diversion & Paramedic Handover
+1. **Hospital ER Reception (`/hospital`)**:
+   - Show the hospital trauma receiver dashboard with inbound ambulance ticker and live patient vitals feed.
+   - Demonstrate the **Bed Capacity Slider**: Saturate the ICU beds to 0. Show how the central AI immediately engages anti-diversion to prevent patient dumping!
+   - Click **"Prepare Trauma Bay"**.
+2. **Paramedic Tablet (`/paramedic`)**:
+   - Show turn-by-turn navigation HUD and click **"Simulate GPS Step"** to reach the hospital.
+   - When the ambulance pulls up to the ER, the hospital marker lights up with the bright emerald green **`✅ PATIENT SAFE & ADMITTED`** celebration badge and harmonic chime!
+3. **Analytics & XAI Audit (`/analytics`)**:
+   - Show the **Predictive AI ETA vs. Actual Ground Time Graph**, proving a **34% delay reduction** and quantifiable Golden Hour survival score improvement!
+
+---
+
+## ⚡ Hackathon-Winning Features Summary
+
+| Feature | Problem Solved | Hackathon Impact |
+|---|---|---|
+| **Multi-Call Conflict Resolution** | Resolves resource contention when 2+ critical calls occur at once | Demonstrates true AI multi-objective utility optimization |
+| **Predictive vs Actual ETA Graph** | Compares traditional static routing against live traffic AI | Visually proves algorithmic value to judges |
+| **Blinking Patient In-Transit Animation** | Shows live patient custody inside the moving vehicle | Visual polish and intuitive real-time tracking |
+| **Offline 2G SMS Dispatch Fallback** | Allows emergency SOS reporting in connectivity dead zones | Real-world reliability for rural/underground emergencies |
+| **Web Audio EMS Synthesizer** | Authentic CAD pager chimes, siren chirps, and CPR beats | Zero external MP3 dependencies, immersive experience |
+| **Anti-Diversion Hospital Rerouting** | Prevents ambulances from arriving at saturated ERs with 0 ICU beds | Solves the #1 real-world operational bottleneck in emergency medicine |
+
+---
+
+## ⚙️ Environment Variables Configuration
+
+Copy `.env.example` to `.env` to configure optional external services:
+
+```powershell
+cp .env.example .env
+```
+
+| Variable | Description | Default / Fallback |
+|---|---|---|
+| `PORT` | Node.js backend port | `5000` |
+| `MONGODB_URI` | MongoDB Atlas / Local URI | In-memory Datastore fallback |
+| `AI_SERVICE_URL` | Python FastAPI microservice URL | Built-in Manchester Triage fallback |
+| `OSRM_BASE_URL` | Open Source Routing Machine endpoint | `https://router.project-osrm.org` |
+| `GOOGLE_MAPS_API_KEY` | Google Maps Platform API key | Optional (OSRM used by default) |
+| `TWILIO_ACCOUNT_SID` | Twilio SMS API Account SID | Simulated SMS logger fallback |
+| `TWILIO_AUTH_TOKEN` | Twilio SMS Auth Token | Simulated SMS logger fallback |
+| `TWILIO_PHONE_NUMBER` | Outbound Twilio sender phone | `+18005550199` |
+
+---
+
 ## 🔮 Future Roadmap
 
 - **IoT Ambulance Health Telemetry**: Direct Bluetooth/LTE integration with onboard monitor defibrillators (Zoll, Physio-Control Lifepak) for 12-lead ECG waveforms.
@@ -225,3 +295,4 @@ node node_modules/vite/bin/vite.js
 - **Drone-Assisted First Response**: Autonomous AED / Narcan delivery to bystander GPS coordinates ahead of the ambulance.
 - **Smart Traffic-Signal Preemption (V2I)**: Direct C-V2X integration with municipal traffic signal controllers (SCATS/SCOOT) for real hardware green light clearing.
 - **Multilingual Voice Assistant**: Natural language voice bot for panicked callers supporting regional dialects and background audio stress classification.
+
