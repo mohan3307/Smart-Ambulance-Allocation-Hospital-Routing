@@ -578,8 +578,12 @@ export const CommandDashboard = ({ onOpenSOS }) => {
       {/* Main Grid: Live GIS Map (Left) + Dispatch Queue / Actions (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* Map View (7 cols or 12 cols when Full Map) */}
-        <div className={`${isFullMap ? 'lg:col-span-12' : 'lg:col-span-7'} flex flex-col space-y-3 transition-all duration-300`}>
+        {/* Map View (7 cols or Fixed Full Screen Mode when Full Map) */}
+        <div className={`${
+          isFullMap
+            ? 'fixed inset-0 z-[1000] bg-slate-950 p-3 flex flex-col space-y-2'
+            : 'lg:col-span-7 flex flex-col space-y-3'
+        } transition-all duration-300`}>
           
           {/* Golden Hour Survival Protocol Banner */}
           {selectedIncident && selectedIncident.status !== 'Resolved' && (selectedIncident.triage?.esiLevel || 2) <= 2 && (
@@ -664,7 +668,7 @@ export const CommandDashboard = ({ onOpenSOS }) => {
             </div>
           </div>
 
-          <div className={`${isFullMap ? 'h-[78vh]' : 'h-[520px]'} rounded-xl overflow-hidden transition-all duration-300`}>
+          <div className={`${isFullMap ? 'flex-1 w-full min-h-0' : 'h-[520px]'} rounded-xl overflow-hidden transition-all duration-300`}>
             <EmergencyMap
               ambulances={ambulances}
               hospitals={hospitals}

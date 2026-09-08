@@ -218,6 +218,23 @@ function MapCameraController({ targetCoords }) {
   return null;
 }
 
+// Handles container resize & full screen expansion so Leaflet invalidates bounds immediately
+function MapResizeController({ isFullMap }) {
+  const map = useMap();
+  useEffect(() => {
+    map.invalidateSize();
+    const timers = [
+      setTimeout(() => map.invalidateSize(), 50),
+      setTimeout(() => map.invalidateSize(), 150),
+      setTimeout(() => map.invalidateSize(), 300),
+      setTimeout(() => map.invalidateSize(), 600),
+    ];
+    return () => timers.forEach(clearTimeout);
+  }, [isFullMap, map]);
+
+  return null;
+}
+
 export const EmergencyMap = ({
   ambulances = [],
   hospitals = [],
@@ -556,6 +573,7 @@ export const EmergencyMap = ({
         wheelDebounceTime={40}
         wheelPxPerZoomLevel={90}
         className="w-full h-full"
+        style={{ width: '100%', height: '100%' }}
       >
         {/* Real Google Maps / Traffic / Satellite / OSM Layer */}
         <TileLayer
@@ -567,6 +585,9 @@ export const EmergencyMap = ({
 
         {/* 60 FPS Cinematic Camera Flight Controller */}
         <MapCameraController targetCoords={targetCoords} />
+        
+        {/* Dynamic Resize & Bounds Invalidator */}
+        <MapResizeController isFullMap={isFullMap} />
 
         {/* Polylines for Active Dispatches (Dark Royal Blue Dual-Layer) */}
         {visibleRoutes.map((route, idx) => {

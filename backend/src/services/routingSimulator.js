@@ -103,6 +103,10 @@ export class RoutingSimulator {
     return 6371 * c;
   }
 
+  static calculateHaversineDistanceKm(lat1, lon1, lat2, lon2) {
+    return this.calculateDirectDistanceKm(lat1, lon1, lat2, lon2);
+  }
+
   /**
    * Calculates remaining distance and ETA along a route from a given waypoint index
    */
