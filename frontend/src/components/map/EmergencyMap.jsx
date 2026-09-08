@@ -10,7 +10,9 @@ import {
   Flame, 
   Navigation,
   Clock,
-  Layers
+  Layers,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 
 const MAP_LAYERS = {
@@ -228,6 +230,8 @@ export const EmergencyMap = ({
   showTrafficOverlay = true,
   onSelectIncident,
   onSelectAmbulance,
+  isFullMap = false,
+  onToggleFullMap = null,
 }) => {
   const [mapLayer, setMapLayer] = useState('google_streets');
 
@@ -332,7 +336,26 @@ export const EmergencyMap = ({
       };
     });
 
-  const primaryRoute = activeRoutes[0] || null;
+  // Filter visible routes: prioritize active incident route, and keep routes located in current region
+  const visibleRoutes = activeRoutes.filter((r) => {
+    if (activeIncident && (
+      r.ambulanceId === activeIncident.assignedAmbulance?.ambulanceId ||
+      r.callSign === activeIncident.assignedAmbulance?.callSign
+    )) {
+      return true;
+    }
+    const mid = r.coordinates[Math.floor(r.coordinates.length / 2)];
+    if (!mid) return false;
+    // Route midpoint should be within 1.5 degrees (~150km) of current region
+    return Math.hypot(currentRegion.center[0] - mid[0], currentRegion.center[1] - mid[1]) < 1.5;
+  });
+
+  // Primary route HUD matches selected incident or local route
+  const primaryRoute = (activeIncident && activeRoutes.find(
+    (r) =>
+      r.ambulanceId === activeIncident.assignedAmbulance?.ambulanceId ||
+      r.callSign === activeIncident.assignedAmbulance?.callSign
+  )) || visibleRoutes[0] || activeRoutes[0] || null;
 
   return (
     <div className="relative w-full h-full min-h-[460px] rounded-xl overflow-hidden border border-slate-800 shadow-2xl z-0 isolate">
@@ -423,8 +446,38 @@ export const EmergencyMap = ({
           >
             🌍 OSM
           </button>
+          {onToggleFullMap && (
+            <button
+              type="button"
+              onClick={onToggleFullMap}
+              className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition flex items-center space-x-1 ${
+                isFullMap
+                  ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30 ring-1 ring-amber-400'
+                  : 'bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30'
+              }`}
+              title={isFullMap ? "Restore Split View" : "Expand Full Map"}
+            >
+              {isFullMap ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">{isFullMap ? 'Exit Full' : 'Full Map'}</span>
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Floating Side Button for Quick Full Map Expand */}
+      {onToggleFullMap && (
+        <button
+          type="button"
+          onClick={onToggleFullMap}
+          className="absolute right-3 top-20 z-[400] bg-slate-900/95 hover:bg-slate-800 border border-blue-500/60 p-2.5 rounded-xl shadow-2xl backdrop-blur-md text-white transition-all transform hover:scale-105 flex items-center space-x-1.5 pointer-events-auto"
+          title={isFullMap ? "Collapse to Split Screen" : "Expand Full Map"}
+        >
+          {isFullMap ? <Minimize2 className="w-4 h-4 text-amber-400" /> : <Maximize2 className="w-4 h-4 text-blue-400" />}
+          <span className="text-[10px] font-black uppercase text-slate-200 hidden md:inline">
+            {isFullMap ? 'Split View' : 'Full Map'}
+          </span>
+        </button>
+      )}
 
       {/* Floating Mission Navigation HUD (Distance & ETA) - Placed below top bar */}
       {primaryRoute && (
@@ -507,7 +560,7 @@ export const EmergencyMap = ({
         <MapCameraController targetCoords={targetCoords} />
 
         {/* Polylines for Active Dispatches (Dark Royal Blue Dual-Layer) */}
-        {activeRoutes.map((route, idx) => {
+        {visibleRoutes.map((route, idx) => {
           const midCoord = route.coordinates[Math.floor(route.coordinates.length / 2)];
           return (
             <React.Fragment key={idx}>

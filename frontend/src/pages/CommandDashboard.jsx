@@ -14,7 +14,9 @@ import {
   CheckCircle,
   Sliders,
   Sparkles,
-  Info
+  Info,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import { EmergencyMap } from '../components/map/EmergencyMap';
 import { XAIDecisionCard } from '../components/xai/XAIDecisionCard';
@@ -34,6 +36,7 @@ export const CommandDashboard = ({ onOpenSOS }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showXAIDialog, setShowXAIDialog] = useState(false);
   const [toast, setToast] = useState(null);
+  const [isFullMap, setIsFullMap] = useState(false);
 
   const showToast = (message, type = 'info', title = '') => {
     setToast({ message, type, title });
@@ -337,6 +340,27 @@ export const CommandDashboard = ({ onOpenSOS }) => {
     }
   };
 
+  const handleFastAdmit = async () => {
+    if (!selectedIncident) return;
+    try {
+      SoundFX.playArrivalChime();
+      const incId = selectedIncident.id || selectedIncident._id || selectedIncident.incidentCode;
+      await EmergencyAPI.updateIncidentStatus(
+        incId,
+        'Arrived_Hospital',
+        'Patient fast-admitted to hospital emergency trauma bay'
+      );
+      showToast(
+        `Ambulance delivered patient safely to ${selectedIncident.targetHospital?.name || 'Hospital Trauma Bay'}!`,
+        'success',
+        '✅ Patient Safe & Admitted'
+      );
+      await loadData();
+    } catch (err) {
+      showToast(err.message, 'error', 'Admission Error');
+    }
+  };
+
   const handleAutoDispatch = async (incId) => {
     try {
       SoundFX.playDispatchChime();
@@ -497,8 +521,8 @@ export const CommandDashboard = ({ onOpenSOS }) => {
       {/* Main Grid: Live GIS Map (Left) + Dispatch Queue / Actions (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* Map View (7 cols) */}
-        <div className="lg:col-span-7 flex flex-col space-y-3">
+        {/* Map View (7 cols or 12 cols when Full Map) */}
+        <div className={`${isFullMap ? 'lg:col-span-12' : 'lg:col-span-7'} flex flex-col space-y-3 transition-all duration-300`}>
           
           {/* Golden Hour Survival Protocol Banner */}
           {selectedIncident && selectedIncident.status !== 'Resolved' && (selectedIncident.triage?.esiLevel || 2) <= 2 && (
@@ -540,6 +564,18 @@ export const CommandDashboard = ({ onOpenSOS }) => {
             </div>
             <div className="flex items-center space-x-2 text-xs">
               <button
+                onClick={() => setIsFullMap(!isFullMap)}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg font-bold transition shadow-lg ${
+                  isFullMap
+                    ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/30 ring-2 ring-amber-400'
+                    : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-600/30'
+                }`}
+                title={isFullMap ? "Exit Full Map View" : "Expand to Full Map View"}
+              >
+                {isFullMap ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                <span>{isFullMap ? 'Exit Full Map' : '⛶ Full Map'}</span>
+              </button>
+              <button
                 onClick={handleSimulateMultiCallConflict}
                 className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold transition shadow-lg shadow-purple-600/30"
                 title="Simulate 2 Simultaneous Emergencies & Multi-Ambulance Reallocation"
@@ -564,7 +600,7 @@ export const CommandDashboard = ({ onOpenSOS }) => {
             </div>
           </div>
 
-          <div className="h-[520px] rounded-xl overflow-hidden">
+          <div className={`${isFullMap ? 'h-[78vh]' : 'h-[520px]'} rounded-xl overflow-hidden transition-all duration-300`}>
             <EmergencyMap
               ambulances={ambulances}
               hospitals={hospitals}
@@ -573,12 +609,14 @@ export const CommandDashboard = ({ onOpenSOS }) => {
               selectedRegionId={selectedRegionId}
               onRegionChange={(reg) => setSelectedRegionId(reg.id)}
               onSelectIncident={(inc) => setSelectedIncident(inc)}
+              isFullMap={isFullMap}
+              onToggleFullMap={() => setIsFullMap(!isFullMap)}
             />
           </div>
         </div>
 
-        {/* Dispatch Queue & Selected Incident Detail (5 cols) */}
-        <div className="lg:col-span-5 flex flex-col space-y-4">
+        {/* Dispatch Queue & Selected Incident Detail */}
+        <div className={`${isFullMap ? 'lg:col-span-12 grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2' : 'lg:col-span-5 flex flex-col space-y-4'}`}>
           
           {/* Active Incidents Queue */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl">
@@ -697,26 +735,38 @@ export const CommandDashboard = ({ onOpenSOS }) => {
                 </button>
               )}
 
-              {/* Mission Controls: Green Corridor, Dynamic Reroute, XAI Audit */}
-              <div className="grid grid-cols-2 gap-2 pt-1">
+              {/* Mission Controls: Green Corridor, Fast Admit, Dynamic Reroute, XAI Audit */}
+              <div className="grid grid-cols-3 gap-2 pt-1">
                 <button
                   onClick={() => handleToggleGreenCorridor(selectedIncident.id || selectedIncident._id || selectedIncident.incidentCode)}
-                  className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-lg text-xs font-bold transition shadow ${
+                  className={`flex items-center justify-center space-x-1 py-2 px-1.5 rounded-lg text-xs font-bold transition shadow ${
                     selectedIncident.greenCorridorActive
                       ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
                       : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
                   }`}
+                  title="Toggle Traffic Signal Preemption"
                 >
-                  <Zap className="w-3.5 h-3.5" />
-                  <span>{selectedIncident.greenCorridorActive ? 'Green Corridor ACTIVE' : 'Enable Green Corridor'}</span>
+                  <Zap className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="truncate">{selectedIncident.greenCorridorActive ? 'Corridor On' : 'Green Corridor'}</span>
+                </button>
+
+                <button
+                  onClick={handleFastAdmit}
+                  disabled={selectedIncident.status === 'Arrived_Hospital' || selectedIncident.status === 'Resolved'}
+                  className="flex items-center justify-center space-x-1 py-2 px-1.5 rounded-lg text-xs font-black bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white transition shadow shadow-emerald-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Fast-Admit Patient Immediately to Hospital Trauma Bay"
+                >
+                  <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="truncate">{selectedIncident.status === 'Arrived_Hospital' ? '✅ Admitted' : '⚡ Fast Admit'}</span>
                 </button>
 
                 <button
                   onClick={() => handleTriggerReroute(selectedIncident.assignedAmbulance?.ambulanceId)}
-                  className="flex items-center justify-center space-x-1.5 py-2 px-3 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white transition shadow"
+                  className="flex items-center justify-center space-x-1 py-2 px-1.5 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white transition shadow"
+                  title="Simulate Corridor Traffic Jam & Dynamic Reroute"
                 >
-                  <Navigation className="w-3.5 h-3.5" />
-                  <span>Simulate Traffic Jam</span>
+                  <Navigation className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="truncate">Traffic Spike</span>
                 </button>
               </div>
 

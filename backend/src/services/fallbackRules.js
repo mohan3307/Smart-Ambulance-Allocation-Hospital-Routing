@@ -123,12 +123,16 @@ export class FallbackRulesEngine {
       const required = triage.required_equipment || [];
       const missing = required.filter((eq) => !ambEquipment.includes(eq));
 
-      let score = Math.max(10, 100 - eta * 4.5);
+      // Proximity is paramount: nearest ambulance in local sector is always prioritized
+      let score = 100 - (dist * 4.5) - (eta * 2.0);
+      if (dist > 30) {
+        score -= 500; // Strongly disfavor cross-sector/distant units
+      }
       if (missing.length > 0) {
-        score -= missing.length * 20;
+        score -= missing.length * 15;
       }
       if (triage.esi_level <= 2 && amb.ambulanceType === 'BLS') {
-        score -= 30; // BLS penalty for critical cases
+        score -= 25; // BLS penalty for critical cases
       }
 
       return {

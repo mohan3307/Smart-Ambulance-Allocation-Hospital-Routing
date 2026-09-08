@@ -54,10 +54,39 @@ export const createEmergencyIncident = async (req, res) => {
     const allAmbulances = await DataStore.getAmbulances();
     const allHospitals = await DataStore.getHospitals();
 
-    // Filter available ambulances (or all if all busy)
-    let candidateAmbulances = allAmbulances.filter((a) => a.status === 'Available');
+    // Filter ambulances strictly by proximity to incident location (<= 35km for same city/sector)
+    const ambWithDist = allAmbulances.map((a) => {
+      const aLat = a.location?.latitude || a.latitude;
+      const aLon = a.location?.longitude || a.longitude;
+      const dist = (aLat && aLon)
+        ? RoutingSimulator.calculateHaversineDistanceKm(aLat, aLon, location.latitude, location.longitude)
+        : 9999;
+      return { ...a, _distanceToScene: dist };
+    });
+
+    let localAmbulances = ambWithDist.filter((a) => a._distanceToScene <= 35);
+    if (localAmbulances.length === 0) {
+      localAmbulances = [...ambWithDist].sort((a, b) => a._distanceToScene - b._distanceToScene).slice(0, 4);
+    }
+
+    let candidateAmbulances = localAmbulances.filter((a) => a.status === 'Available');
     if (candidateAmbulances.length === 0) {
-      candidateAmbulances = allAmbulances;
+      candidateAmbulances = localAmbulances;
+    }
+
+    // Filter candidate hospitals to within 45km of incident location
+    const hospWithDist = allHospitals.map((h) => {
+      const hLat = h.location?.latitude || h.latitude;
+      const hLon = h.location?.longitude || h.longitude;
+      const dist = (hLat && hLon)
+        ? RoutingSimulator.calculateHaversineDistanceKm(hLat, hLon, location.latitude, location.longitude)
+        : 9999;
+      return { ...h, _distanceToScene: dist };
+    });
+
+    let candidateHospitals = hospWithDist.filter((h) => h._distanceToScene <= 45);
+    if (candidateHospitals.length === 0) {
+      candidateHospitals = [...hospWithDist].sort((a, b) => a._distanceToScene - b._distanceToScene).slice(0, 5);
     }
 
     // Call AI Optimization Pipeline (with automatic fallback to Manchester Triage / ESI rules engine)
@@ -75,7 +104,7 @@ export const createEmergencyIncident = async (req, res) => {
       },
       location,
       candidateAmbulances,
-      allHospitals
+      candidateHospitals
     );
 
     const { triage, ambulance_allocation, hospital_recommendation, xai_explanation, system_engine } =
@@ -325,8 +354,38 @@ export const autoDispatchIncident = async (req, res) => {
     const allAmbulances = await DataStore.getAmbulances();
     const allHospitals = await DataStore.getHospitals();
 
-    let candidateAmbulances = allAmbulances.filter((a) => a.status === 'Available');
-    if (candidateAmbulances.length === 0) candidateAmbulances = allAmbulances;
+    // Filter ambulances strictly by proximity to incident location (<= 35km for same city/sector)
+    const ambWithDist = allAmbulances.map((a) => {
+      const aLat = a.location?.latitude || a.latitude;
+      const aLon = a.location?.longitude || a.longitude;
+      const dist = (aLat && aLon)
+        ? RoutingSimulator.calculateHaversineDistanceKm(aLat, aLon, incident.location.latitude, incident.location.longitude)
+        : 9999;
+      return { ...a, _distanceToScene: dist };
+    });
+
+    let localAmbulances = ambWithDist.filter((a) => a._distanceToScene <= 35);
+    if (localAmbulances.length === 0) {
+      localAmbulances = [...ambWithDist].sort((a, b) => a._distanceToScene - b._distanceToScene).slice(0, 4);
+    }
+
+    let candidateAmbulances = localAmbulances.filter((a) => a.status === 'Available');
+    if (candidateAmbulances.length === 0) candidateAmbulances = localAmbulances;
+
+    // Filter candidate hospitals to within 45km of incident location
+    const hospWithDist = allHospitals.map((h) => {
+      const hLat = h.location?.latitude || h.latitude;
+      const hLon = h.location?.longitude || h.longitude;
+      const dist = (hLat && hLon)
+        ? RoutingSimulator.calculateHaversineDistanceKm(hLat, hLon, incident.location.latitude, incident.location.longitude)
+        : 9999;
+      return { ...h, _distanceToScene: dist };
+    });
+
+    let candidateHospitals = hospWithDist.filter((h) => h._distanceToScene <= 45);
+    if (candidateHospitals.length === 0) {
+      candidateHospitals = [...hospWithDist].sort((a, b) => a._distanceToScene - b._distanceToScene).slice(0, 5);
+    }
 
     const opt = await AIClientService.performFullOptimization(
       {
@@ -340,7 +399,7 @@ export const autoDispatchIncident = async (req, res) => {
       },
       incident.location,
       candidateAmbulances,
-      allHospitals
+      candidateHospitals
     );
 
     const selectedAmb = opt.ambulance_allocation.selected_ambulance;

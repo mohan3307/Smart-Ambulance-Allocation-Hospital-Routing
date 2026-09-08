@@ -53,7 +53,7 @@ const io = new SocketIOServer(httpServer, {
 initSocketManager(io);
 
 // Background Telemetry Simulation Loop
-// Advances active dispatched ambulances along their waypoints every 3 seconds
+// Advances active dispatched ambulances along their waypoints rapidly (every 1.2 seconds)
 setInterval(async () => {
   try {
     const ambulances = await DataStore.getAmbulances();
@@ -69,7 +69,9 @@ setInterval(async () => {
       const maxIndex = amb.activeRoute.length - 1;
 
       if (currentIndex < maxIndex) {
-        currentIndex += 1;
+        // Fast progress: dynamic step so the entire mission completes in ~12 to 15 seconds
+        const step = Math.max(1, Math.ceil(maxIndex / 12));
+        currentIndex = Math.min(maxIndex, currentIndex + step);
         const nextCoord = amb.activeRoute[currentIndex];
         const { remainingKm, etaMinutes } = RoutingSimulator.computeRemainingETA(
           amb.activeRoute,
@@ -80,20 +82,39 @@ setInterval(async () => {
 
         let newStatus = amb.status;
         const sceneWaypointIndex = Math.floor(amb.activeRoute.length * 0.45);
-        if (currentIndex >= sceneWaypointIndex && currentIndex < sceneWaypointIndex + 2 && amb.status === 'En_Route_Scene') {
+        if (currentIndex >= sceneWaypointIndex && currentIndex < sceneWaypointIndex + step * 2 && amb.status === 'En_Route_Scene') {
           newStatus = 'On_Scene';
           if (amb.currentIncidentId) {
             await DataStore.updateIncident(amb.currentIncidentId, { status: 'On_Scene' });
+            broadcastEvent('incident:status_changed', {
+              incidentId: amb.currentIncidentId,
+              status: 'On_Scene',
+              message: 'Ambulance on scene. Paramedics assessing vitals and boarding patient.',
+            });
           }
-        } else if (currentIndex >= sceneWaypointIndex + 2 && (amb.status === 'En_Route_Scene' || amb.status === 'On_Scene')) {
+        } else if (currentIndex >= sceneWaypointIndex + step * 2 && (amb.status === 'En_Route_Scene' || amb.status === 'On_Scene')) {
           newStatus = 'En_Route_Hospital';
           if (amb.currentIncidentId) {
             await DataStore.updateIncident(amb.currentIncidentId, { status: 'En_Route_Hospital' });
+            broadcastEvent('incident:status_changed', {
+              incidentId: amb.currentIncidentId,
+              status: 'En_Route_Hospital',
+              message: 'Patient safely loaded into ambulance. En route to hospital trauma bay with sirens active.',
+            });
           }
         } else if (currentIndex >= maxIndex) {
           newStatus = 'Arrived_Hospital';
           if (amb.currentIncidentId) {
-            await DataStore.updateIncident(amb.currentIncidentId, { status: 'Arrived_Hospital' });
+            await DataStore.updateIncident(amb.currentIncidentId, { 
+              status: 'Arrived_Hospital',
+              patientSafe: true,
+            });
+            broadcastEvent('incident:status_changed', {
+              incidentId: amb.currentIncidentId,
+              status: 'Arrived_Hospital',
+              patientSafe: true,
+              message: '✅ PATIENT SAFE & ADMITTED at hospital trauma bay.',
+            });
           }
         }
 
@@ -124,7 +145,7 @@ setInterval(async () => {
   } catch (err) {
     // Ignore simulation cycle errors
   }
-}, 3500);
+}, 1200);
 
 const startServer = async () => {
   await connectDB();
