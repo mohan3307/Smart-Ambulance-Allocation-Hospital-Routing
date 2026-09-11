@@ -24,7 +24,8 @@ import {
   HeartPulse,
   Filter,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  ChevronRight
 } from 'lucide-react';
 import { EmergencyMap } from '../components/map/EmergencyMap';
 import { XAIDecisionCard } from '../components/xai/XAIDecisionCard';
