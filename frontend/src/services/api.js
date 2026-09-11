@@ -6,6 +6,15 @@ const api = axios.create({
   timeout: 10000,
 });
 
+// Attach Authorization Bearer token if present
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('aegis_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export const EmergencyAPI = {
   // Incidents
   getIncidents: async () => (await api.get('/incidents')).data,
@@ -32,3 +41,11 @@ export const EmergencyAPI = {
   getAuditLogs: async () => (await api.get('/system/audits')).data,
   resetSystemData: async () => (await api.post('/system/reset')).data,
 };
+
+export const AuthAPI = {
+  login: async (credentials) => (await api.post('/auth/login', credentials)).data,
+  register: async (userData) => (await api.post('/auth/register', userData)).data,
+  getMe: async () => (await api.get('/auth/me')).data,
+  getDemoAccounts: async () => (await api.get('/auth/demo-accounts')).data,
+};
+

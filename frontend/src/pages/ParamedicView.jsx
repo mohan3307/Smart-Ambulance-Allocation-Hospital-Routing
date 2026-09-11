@@ -19,7 +19,7 @@ import { EmergencyAPI } from '../services/api';
 import { useSocket } from '../context/SocketContext';
 
 export const ParamedicView = () => {
-  const { socket, lastNotification } = useSocket();
+  const { socket, lastNotification, joinRole } = useSocket();
   const [ambulances, setAmbulances] = useState([]);
   const [selectedAmbId, setSelectedAmbId] = useState('');
   const [incidents, setIncidents] = useState([]);
@@ -55,11 +55,61 @@ export const ParamedicView = () => {
     }
   };
 
+  // Real-Time WebSocket Synchronization (No REST polling)
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 4000);
-    return () => clearInterval(interval);
-  }, []);
+
+    if (!socket) return;
+    if (selectedAmbId) {
+      joinRole('ambulance', selectedAmbId);
+    }
+
+    const handlePosUpdate = (data) => {
+      setAmbulances((prev) =>
+        prev.map((a) =>
+          (a.id === data.ambulanceId || a._id === data.ambulanceId)
+            ? {
+                ...a,
+                location: {
+                  ...a.location,
+                  coordinates: data.coordinates,
+                  longitude: data.coordinates[0],
+                  latitude: data.coordinates[1],
+                  speedKmH: data.speedKmH,
+                },
+                remainingKm: data.remainingKm,
+                etaMinutes: data.etaMinutes,
+                routeProgressIndex: data.routeProgressIndex,
+              }
+            : a
+        )
+      );
+    };
+
+    const handleAmbulanceStatus = (data) => {
+      setAmbulances((prev) =>
+        prev.map((a) =>
+          (a.id === data.ambulanceId || a._id === data.ambulanceId)
+            ? { ...a, status: data.status }
+            : a
+        )
+      );
+    };
+
+    const handleRefreshIncidents = () => {
+      loadData();
+    };
+
+    socket.on('ambulance:position_updated', handlePosUpdate);
+    socket.on('ambulance:status_changed', handleAmbulanceStatus);
+    socket.on('ambulance:dispatched', handleRefreshIncidents);
+
+    return () => {
+      socket.off('ambulance:position_updated', handlePosUpdate);
+      socket.off('ambulance:status_changed', handleAmbulanceStatus);
+      socket.off('ambulance:dispatched', handleRefreshIncidents);
+    };
+  }, [socket, selectedAmbId]);
 
   const currentAmb = ambulances.find(
     (a) => (a.id || a._id).toString() === selectedAmbId.toString()

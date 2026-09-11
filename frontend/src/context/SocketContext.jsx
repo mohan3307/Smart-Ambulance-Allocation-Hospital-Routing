@@ -67,8 +67,44 @@ export const SocketProvider = ({ children }) => {
 
   const clearNotification = () => setLastNotification(null);
 
+  // Helper actions for bidirectional real-time communication
+  const joinRole = (role, id = null) => {
+    if (socket && socket.connected) {
+      socket.emit('join_role', { role, id });
+    }
+  };
+
+  const streamAmbulanceLocation = (locationData) => {
+    if (socket && socket.connected) {
+      socket.emit('ambulance:update_location', locationData);
+    }
+  };
+
+  const updateHospitalBedsLive = (bedData) => {
+    if (socket && socket.connected) {
+      socket.emit('hospital:update_beds', bedData);
+    }
+  };
+
+  const updateAmbulanceStatusLive = (statusData) => {
+    if (socket && socket.connected) {
+      socket.emit('ambulance:update_status', statusData);
+    }
+  };
+
   return (
-    <SocketContext.Provider value={{ socket, connected, lastNotification, clearNotification }}>
+    <SocketContext.Provider
+      value={{
+        socket,
+        connected,
+        lastNotification,
+        clearNotification,
+        joinRole,
+        streamAmbulanceLocation,
+        updateHospitalBedsLive,
+        updateAmbulanceStatusLive,
+      }}
+    >
       {children}
     </SocketContext.Provider>
   );

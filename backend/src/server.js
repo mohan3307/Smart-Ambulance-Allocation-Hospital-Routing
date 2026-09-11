@@ -11,6 +11,7 @@ import { broadcastEvent } from './services/socketManager.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import apiRoutes from './routes/api.js';
+import { seedDemoUsersIfConnected } from './controllers/authController.js';
 
 dotenv.config();
 
@@ -153,6 +154,7 @@ setInterval(async () => {
 
 const startServer = async () => {
   await connectDB();
+  await seedDemoUsersIfConnected();
   await DataStore.initialize();
 
   httpServer.listen(PORT, () => {

@@ -54,39 +54,26 @@ export const createEmergencyIncident = async (req, res) => {
     const allAmbulances = await DataStore.getAmbulances();
     const allHospitals = await DataStore.getHospitals();
 
-    // Filter ambulances strictly by proximity to incident location (<= 35km for same city/sector)
-    const ambWithDist = allAmbulances.map((a) => {
-      const aLat = a.location?.latitude || a.latitude;
-      const aLon = a.location?.longitude || a.longitude;
-      const dist = (aLat && aLon)
-        ? RoutingSimulator.calculateHaversineDistanceKm(aLat, aLon, location.latitude, location.longitude)
-        : 9999;
-      return { ...a, _distanceToScene: dist };
-    });
+    const incLon = location.longitude ?? location.coordinates?.[0] ?? 77.5946;
+    const incLat = location.latitude ?? location.coordinates?.[1] ?? 12.9716;
 
-    let localAmbulances = ambWithDist.filter((a) => a._distanceToScene <= 35);
-    if (localAmbulances.length === 0) {
-      localAmbulances = [...ambWithDist].sort((a, b) => a._distanceToScene - b._distanceToScene).slice(0, 4);
-    }
-
-    let candidateAmbulances = localAmbulances.filter((a) => a.status === 'Available');
+    // Use MongoDB 2dsphere $geoNear geospatial aggregation (with in-memory spatial fallback)
+    let candidateAmbulances = await DataStore.findNearestAmbulances(incLon, incLat, 35000, { status: 'Available' });
     if (candidateAmbulances.length === 0) {
-      candidateAmbulances = localAmbulances;
+      candidateAmbulances = await DataStore.findNearestAmbulances(incLon, incLat, 35000);
+    }
+    if (candidateAmbulances.length === 0) {
+      const all = await DataStore.getAmbulances();
+      candidateAmbulances = all.slice(0, 4);
     }
 
-    // Filter candidate hospitals to within 45km of incident location
-    const hospWithDist = allHospitals.map((h) => {
-      const hLat = h.location?.latitude || h.latitude;
-      const hLon = h.location?.longitude || h.longitude;
-      const dist = (hLat && hLon)
-        ? RoutingSimulator.calculateHaversineDistanceKm(hLat, hLon, location.latitude, location.longitude)
-        : 9999;
-      return { ...h, _distanceToScene: dist };
-    });
-
-    let candidateHospitals = hospWithDist.filter((h) => h._distanceToScene <= 45);
+    let candidateHospitals = await DataStore.findNearestHospitals(incLon, incLat, 45000, { diversionStatus: false });
     if (candidateHospitals.length === 0) {
-      candidateHospitals = [...hospWithDist].sort((a, b) => a._distanceToScene - b._distanceToScene).slice(0, 5);
+      candidateHospitals = await DataStore.findNearestHospitals(incLon, incLat, 45000);
+    }
+    if (candidateHospitals.length === 0) {
+      const allH = await DataStore.getHospitals();
+      candidateHospitals = allH.slice(0, 5);
     }
 
     // Call AI Optimization Pipeline (with automatic fallback to Manchester Triage / ESI rules engine)
@@ -354,37 +341,24 @@ export const autoDispatchIncident = async (req, res) => {
     const allAmbulances = await DataStore.getAmbulances();
     const allHospitals = await DataStore.getHospitals();
 
-    // Filter ambulances strictly by proximity to incident location (<= 35km for same city/sector)
-    const ambWithDist = allAmbulances.map((a) => {
-      const aLat = a.location?.latitude || a.latitude;
-      const aLon = a.location?.longitude || a.longitude;
-      const dist = (aLat && aLon)
-        ? RoutingSimulator.calculateHaversineDistanceKm(aLat, aLon, incident.location.latitude, incident.location.longitude)
-        : 9999;
-      return { ...a, _distanceToScene: dist };
-    });
+    const incLon = incident.location?.longitude ?? incident.location?.coordinates?.[0] ?? 77.5946;
+    const incLat = incident.location?.latitude ?? incident.location?.coordinates?.[1] ?? 12.9716;
 
-    let localAmbulances = ambWithDist.filter((a) => a._distanceToScene <= 35);
-    if (localAmbulances.length === 0) {
-      localAmbulances = [...ambWithDist].sort((a, b) => a._distanceToScene - b._distanceToScene).slice(0, 4);
+    // Use MongoDB 2dsphere $geoNear geospatial aggregation (with in-memory spatial fallback)
+    let candidateAmbulances = await DataStore.findNearestAmbulances(incLon, incLat, 35000, { status: 'Available' });
+    if (candidateAmbulances.length === 0) {
+      candidateAmbulances = await DataStore.findNearestAmbulances(incLon, incLat, 35000);
+    }
+    if (candidateAmbulances.length === 0) {
+      candidateAmbulances = allAmbulances.slice(0, 4);
     }
 
-    let candidateAmbulances = localAmbulances.filter((a) => a.status === 'Available');
-    if (candidateAmbulances.length === 0) candidateAmbulances = localAmbulances;
-
-    // Filter candidate hospitals to within 45km of incident location
-    const hospWithDist = allHospitals.map((h) => {
-      const hLat = h.location?.latitude || h.latitude;
-      const hLon = h.location?.longitude || h.longitude;
-      const dist = (hLat && hLon)
-        ? RoutingSimulator.calculateHaversineDistanceKm(hLat, hLon, incident.location.latitude, incident.location.longitude)
-        : 9999;
-      return { ...h, _distanceToScene: dist };
-    });
-
-    let candidateHospitals = hospWithDist.filter((h) => h._distanceToScene <= 45);
+    let candidateHospitals = await DataStore.findNearestHospitals(incLon, incLat, 45000, { diversionStatus: false });
     if (candidateHospitals.length === 0) {
-      candidateHospitals = [...hospWithDist].sort((a, b) => a._distanceToScene - b._distanceToScene).slice(0, 5);
+      candidateHospitals = await DataStore.findNearestHospitals(incLon, incLat, 45000);
+    }
+    if (candidateHospitals.length === 0) {
+      candidateHospitals = allHospitals.slice(0, 5);
     }
 
     const opt = await AIClientService.performFullOptimization(

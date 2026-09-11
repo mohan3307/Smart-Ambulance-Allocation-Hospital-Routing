@@ -12,15 +12,59 @@ import {
   Wifi,
   WifiOff,
   Volume2,
-  VolumeX
+  VolumeX,
+  User,
+  ChevronDown,
+  Check,
 } from 'lucide-react';
 import { useSocket } from '../../context/SocketContext';
+import { useAuth } from '../../context/AuthContext';
 import { SoundFX } from '../../services/soundEffects';
 
 export const Navbar = ({ activeView, setActiveView, systemStats, activeIncidentCount = 0 }) => {
   const { connected } = useSocket();
+  const { user, role, switchRole } = useAuth();
   const [soundOn, setSoundOn] = React.useState(SoundFX.isSoundEnabled());
+  const [roleMenuOpen, setRoleMenuOpen] = React.useState(false);
   const isAiOptimized = systemStats?.system?.aiEngine === 'ai_optimized';
+
+  const roleOptions = [
+    {
+      id: 'dispatcher',
+      label: 'Dispatcher (CAD)',
+      desc: 'Central Emergency Dispatch & Triage',
+      badgeColor: 'bg-blue-900/40 text-blue-300 border-blue-600/40',
+      dotColor: 'bg-blue-400',
+      targetView: 'command',
+    },
+    {
+      id: 'ambulance_driver',
+      label: 'Paramedic / Driver',
+      desc: 'Unit AMB-01 Live In-Cab Navigation',
+      badgeColor: 'bg-rose-900/40 text-rose-300 border-rose-600/40',
+      dotColor: 'bg-rose-400',
+      targetView: 'paramedic',
+    },
+    {
+      id: 'hospital_staff',
+      label: 'Hospital ER Staff',
+      desc: 'Apollo Greams Emergency Bay & Beds',
+      badgeColor: 'bg-emerald-900/40 text-emerald-300 border-emerald-600/40',
+      dotColor: 'bg-emerald-400',
+      targetView: 'hospital',
+    },
+    {
+      id: 'admin',
+      label: 'Platform Admin',
+      desc: 'Full System & Analytics Governance',
+      badgeColor: 'bg-purple-900/40 text-purple-300 border-purple-600/40',
+      dotColor: 'bg-purple-400',
+      targetView: 'analytics',
+    },
+  ];
+
+  const currentRoleConfig = roleOptions.find((r) => r.id === role) || roleOptions[0];
+
 
   const navItems = [
     { id: 'command', label: 'Command Dispatch', icon: Activity, badge: activeIncidentCount },
@@ -127,6 +171,60 @@ export const Navbar = ({ activeView, setActiveView, systemStats, activeIncidentC
                   <span className="w-2 h-2 rounded-full bg-rose-500"></span>
                   <span className="hidden sm:inline text-rose-400">Offline</span>
                 </>
+              )}
+            </div>
+
+            {/* Role Switcher & Active User Profile */}
+            <div className="relative">
+              <button
+                onClick={() => setRoleMenuOpen(!roleMenuOpen)}
+                className={`flex items-center space-x-2 px-2.5 py-1 rounded-lg border text-xs font-medium transition ${currentRoleConfig.badgeColor} hover:brightness-110 shadow-sm`}
+                title={`Logged in as ${user?.name || 'User'} (${currentRoleConfig.label})`}
+              >
+                <span className={`w-2 h-2 rounded-full ${currentRoleConfig.dotColor} animate-pulse`}></span>
+                <span className="font-semibold hidden lg:inline">{currentRoleConfig.label}</span>
+                <span className="font-semibold lg:hidden">{role.slice(0, 4).toUpperCase()}</span>
+                <ChevronDown className="w-3.5 h-3.5 opacity-70" />
+              </button>
+
+              {roleMenuOpen && (
+                <div className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-2 z-50">
+                  <div className="px-3 py-2 border-b border-slate-800">
+                    <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Active Operator</div>
+                    <div className="text-xs font-bold text-white truncate">{user?.name || 'Operator'}</div>
+                    <div className="text-[11px] text-slate-400 truncate">{user?.email}</div>
+                    {user?.badgeNumber && (
+                      <div className="text-[10px] text-cyan-400 font-mono mt-0.5">Badge #{user.badgeNumber}</div>
+                    )}
+                  </div>
+
+                  <div className="px-3 py-1.5 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                    Switch Role (JWT Role-Based Auth)
+                  </div>
+
+                  {roleOptions.map((opt) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => {
+                        switchRole(opt.id);
+                        if (opt.targetView) setActiveView(opt.targetView);
+                        setRoleMenuOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-xs flex items-start justify-between hover:bg-slate-800 transition ${
+                        role === opt.id ? 'bg-slate-800/80 text-white' : 'text-slate-300'
+                      }`}
+                    >
+                      <div>
+                        <div className="font-semibold flex items-center space-x-1.5">
+                          <span className={`w-1.5 h-1.5 rounded-full ${opt.dotColor}`}></span>
+                          <span>{opt.label}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">{opt.desc}</div>
+                      </div>
+                      {role === opt.id && <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />}
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
           </div>

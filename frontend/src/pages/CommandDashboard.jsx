@@ -193,8 +193,6 @@ export const CommandDashboard = ({ onOpenSOS }) => {
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 5000);
-    return () => clearInterval(interval);
   }, []);
 
   // Listen for socket events
@@ -274,6 +272,18 @@ export const CommandDashboard = ({ onOpenSOS }) => {
       });
     });
 
+    socket.on('ambulance:dispatched', () => {
+      loadData();
+    });
+
+    socket.on('ambulance:status_updated', () => {
+      loadData();
+    });
+
+    socket.on('hospital:bed_updated', () => {
+      loadData();
+    });
+
     socket.on('system:reset', () => {
       loadData();
     });
@@ -282,6 +292,9 @@ export const CommandDashboard = ({ onOpenSOS }) => {
       socket.off('incident:created');
       socket.off('ambulance:position_updated');
       socket.off('incident:status_changed');
+      socket.off('ambulance:dispatched');
+      socket.off('ambulance:status_updated');
+      socket.off('hospital:bed_updated');
       socket.off('system:reset');
     };
   }, [socket]);

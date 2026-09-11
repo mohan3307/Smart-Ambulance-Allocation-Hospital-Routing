@@ -25,8 +25,22 @@ import {
   getAuditLogs,
   resetSystemData,
 } from '../controllers/systemController.js';
+import {
+  login,
+  register,
+  getMe,
+  getDemoAccounts,
+} from '../controllers/authController.js';
+import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Auth Endpoints
+router.post('/auth/login', login);
+router.post('/auth/register', register);
+router.get('/auth/me', authenticateToken, getMe);
+router.get('/auth/demo-accounts', getDemoAccounts);
+
 
 // Incidents
 router.get('/incidents', getIncidents);

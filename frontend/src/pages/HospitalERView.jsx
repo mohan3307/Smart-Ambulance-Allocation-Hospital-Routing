@@ -18,7 +18,7 @@ import { useSocket } from '../context/SocketContext';
 import { SoundFX } from '../services/soundEffects';
 
 export const HospitalERView = () => {
-  const { socket } = useSocket();
+  const { socket, updateHospitalBedsLive } = useSocket();
   const [hospitals, setHospitals] = useState([]);
   const [selectedHospitalId, setSelectedHospitalId] = useState('');
   const [incidents, setIncidents] = useState([]);
@@ -60,11 +60,38 @@ export const HospitalERView = () => {
     }
   };
 
+  // Live WebSocket Event Sync (Zero REST polling)
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 5000);
-    return () => clearInterval(interval);
-  }, []);
+
+    if (!socket) return;
+
+    const handleBedUpdate = (data) => {
+      setHospitals((prev) =>
+        prev.map((h) =>
+          (h.id === data.hospitalId || h._id === data.hospitalId)
+            ? { ...h, erBedsAvailable: data.erBedsAvailable, icuBedsAvailable: data.icuBedsAvailable, diversionStatus: data.diversionStatus }
+            : h
+        )
+      );
+    };
+
+    const handleIncidentUpdate = () => {
+      loadData();
+    };
+
+    socket.on('hospital:bed_updated', handleBedUpdate);
+    socket.on('ambulance:dispatched', handleIncidentUpdate);
+    socket.on('incident:status_changed', handleIncidentUpdate);
+    socket.on('hospital:incoming_patient', handleIncidentUpdate);
+
+    return () => {
+      socket.off('hospital:bed_updated', handleBedUpdate);
+      socket.off('ambulance:dispatched', handleIncidentUpdate);
+      socket.off('incident:status_changed', handleIncidentUpdate);
+      socket.off('hospital:incoming_patient', handleIncidentUpdate);
+    };
+  }, [socket]);
 
   const currentHospital = hospitals.find(
     (h) => (h.id || h._id).toString() === selectedHospitalId.toString()
@@ -80,13 +107,24 @@ export const HospitalERView = () => {
   const handleSaveBedChanges = async () => {
     setIsUpdating(true);
     try {
-      await EmergencyAPI.updateHospitalBeds(selectedHospitalId, {
+      const payload = {
+        hospitalId: selectedHospitalId,
         erBedsAvailable: parseInt(erAvailable),
         icuBedsAvailable: parseInt(icuAvailable),
         diversionStatus: diversion,
+      };
+
+      // 1. Emit live WebSocket update so all dispatchers and CAD dashboards update instantly
+      updateHospitalBedsLive(payload);
+
+      // 2. Persist to API
+      await EmergencyAPI.updateHospitalBeds(selectedHospitalId, {
+        erBedsAvailable: payload.erBedsAvailable,
+        icuBedsAvailable: payload.icuBedsAvailable,
+        diversionStatus: payload.diversionStatus,
       });
-      await loadData();
-      showToast('Hospital bed capacity updated! Central AI allocator synchronized.', 'success', 'Capacity Synchronized');
+
+      showToast('Hospital bed capacity updated! Central AI allocator synchronized via WebSockets.', 'success', 'Live Capacity Synchronized');
     } catch (err) {
       showToast(err.message, 'error', 'Error Updating Beds');
     } finally {
